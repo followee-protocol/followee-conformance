@@ -1,0 +1,91 @@
+name: scaffold-ci
+
+on:
+  push:
+  pull_request:
+
+# Milestone 0 CI (HARNESS.md Section 19): integrity checks, schema
+# validation, harness and adapter unit tests, lint/format, the hello
+# handshake, and the negative pin-refusal test.  No job depends on the
+# public Internet after checkout and dependency installation.
+
+jobs:
+  integrity:
+    name: submodule, tag, and digest integrity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+      - name: verify every Section 2 pin
+        run: python3 scripts/check_pins.py
+
+  harness-tests:
+    name: harness unit tests and schema validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+      - name: schema files parse as JSON
+        run: |
+          for f in schemas/*.schema.json; do
+            python3 -c "import json,sys; json.load(open(sys.argv[1]))" "$f"
+            echo "ok: $f"
+          done
+      - name: harness unit tests
+        run: python3 -m unittest discover -s harness/tests -t . -v
+
+  python-adapter:
+    name: python adapter tests and lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+      - name: adapter unit and process tests
+        run: python3 -m unittest discover -s adapters/python/tests -t . -v
+      - name: python lint (ruff)
+        run: |
+          python3 -m pip install --quiet ruff
+          ruff check harness adapters/python scripts
+          ruff format --check harness adapters/python scripts
+
+  rust-adapter:
+    name: rust adapter build, tests, and lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: format
+        run: cargo fmt --manifest-path adapters/rust/Cargo.toml -- --check
+      - name: clippy
+        run: cargo clippy --manifest-path adapters/rust/Cargo.toml --all-targets --locked -- -D warnings
+      - name: build
+        run: cargo build --manifest-path adapters/rust/Cargo.toml --locked
+      - name: tests
+        run: cargo test --manifest-path adapters/rust/Cargo.toml --locked
+
+  handshake:
+    name: hello handshake and pin refusal
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+      - name: build rust adapter
+        run: cargo build --manifest-path adapters/rust/Cargo.toml --locked
+      - name: orchestrator completes both handshakes
+        run: python3 -m harness.orchestrator
+      - name: wrong implementation commit is refused
+        run: sh scripts/negative_pin_test.sh

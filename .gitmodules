@@ -1,0 +1,9 @@
+[submodule "implementations/followee-rs"]
+	path = implementations/followee-rs
+	url = https://github.com/followee-protocol/followee-rs.git
+[submodule "implementations/followee-python-cleanroom"]
+	path = implementations/followee-python-cleanroom
+	url = https://github.com/followee-protocol/followee-python-cleanroom.git
+[submodule "specification"]
+	path = specification
+	url = https://github.com/followee-protocol/followee.git

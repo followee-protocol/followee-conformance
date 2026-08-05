@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "runner-request.schema.json",
+  "title": "Runner protocol v1 request envelope",
+  "$comment": "HARNESS.md 7.1-7.3. Runner JSON rejects unknown members, duplicate member names, and every bare JSON number; those lexical rules are enforced by the strict codec, this schema covers structure. Milestone 0 admits only the hello operation; later milestones extend the operation enum and per-operation input schemas without changing the envelope.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["runnerProtocol", "caseId", "operation", "input"],
+  "properties": {
+    "runnerProtocol": {
+      "const": "1"
+    },
+    "caseId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "operation": {
+      "enum": ["hello"]
+    },
+    "input": {
+      "$comment": "hello takes an empty input object.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {}
+    }
+  }
+}

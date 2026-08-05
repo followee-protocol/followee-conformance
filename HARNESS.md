@@ -121,6 +121,7 @@ followee-conformance/
 ├── README.md
 ├── LICENSE
 ├── .gitignore
+├── specification/                      # pinned Git submodule
 ├── implementations/
 │   ├── followee-rs/                    # pinned Git submodule
 │   └── followee-python-cleanroom/      # pinned Git submodule
@@ -138,9 +139,12 @@ followee-conformance/
 ```
 
 The two implementation directories MUST be Git submodules pinned to the commits
-in Section 2. The Rust adapter uses a path dependency on the Rust submodule. The
-Python adapter imports `tools/python-model` from the Python submodule without
-copying or modifying it.
+in Section 2. The `specification/` directory MUST be a third Git submodule,
+pinned to the `followee-protocol/followee` commit in Section 2; it is the
+harness's neutral source of the normative specification bytes, independent of
+any copy vendored by either implementation. The Rust adapter uses a path
+dependency on the Rust submodule. The Python adapter imports
+`tools/python-model` from the Python submodule without copying or modifying it.
 
 Submodules retain their own licenses and histories. The MIT license of this
 repository applies only to the harness material authored here.
@@ -153,7 +157,9 @@ Before building an adapter, the harness MUST verify:
 - each submodule `HEAD` equals its pinned commit;
 - each relevant public tag peels to that commit;
 - each submodule working tree is clean;
-- the specification bytes have the SHA-256 digest in Section 2;
+- the specification bytes at `specification/Followee-Specification.md`, read
+  from the neutral pinned specification checkout, have the SHA-256 digest in
+  Section 2;
 - the Python model remains at its frozen revision; and
 - the Rust core remains at its reviewed revision.
 
@@ -192,7 +198,8 @@ Runner JSON is not a Followee wire format. It obeys these additional rules:
 
 - unknown object members are rejected;
 - duplicate JSON object names are rejected;
-- floating-point numbers are forbidden;
+- every JSON number token is forbidden, integral tokens included; no
+  conformant runner line contains a bare number;
 - every protocol integer is encoded as an unsigned or signed canonical decimal
   string, with `"0"` as zero and no leading zeroes;
 - every binary value is lowercase, even-length hexadecimal without `0x`;
@@ -276,7 +283,10 @@ MUST refuse to compare adapters whose specification commits, runner versions, or
 required capabilities do not match the campaign.
 
 The commit values SHOULD be supplied by the build or verified checkout, not
-accepted from an unchecked runtime environment variable.
+accepted from an unchecked runtime environment variable. An adapter MAY report
+`specificationCommit` from the harness-verified `specification/` submodule
+checkout, at build time or at startup; the orchestrator MUST cross-check every
+reported commit against the Section 2 pins before comparing anything.
 
 ## 9. Runner operations
 

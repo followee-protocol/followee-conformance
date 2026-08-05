@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "runner-response.schema.json",
+  "title": "Runner protocol v1 response envelope",
+  "$comment": "HARNESS.md 7.3 and 11. Responses repeat the request's runnerProtocol and caseId exactly (echo equality is checked by the orchestrator; this schema fixes the shape). status 'rejected' carries a Followee symbolic error; status 'adapterError' carries a namespaced adapter./harness. symbol plus a diagnostic message and always fails the campaign. adapterError never reuses a Followee error symbol.",
+  "type": "object",
+  "oneOf": [
+    {
+      "title": "accepted",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["runnerProtocol", "caseId", "status", "result"],
+      "properties": {
+        "runnerProtocol": { "const": "1" },
+        "caseId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "status": { "const": "accepted" },
+        "result": { "type": "object" }
+      }
+    },
+    {
+      "title": "rejected",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["runnerProtocol", "caseId", "status", "error"],
+      "properties": {
+        "runnerProtocol": { "const": "1" },
+        "caseId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "status": { "const": "rejected" },
+        "error": {
+          "enum": [
+            "invalidDid",
+            "unsupportedHash",
+            "unsupportedSuite",
+            "recordTooLarge",
+            "invalidCbor",
+            "nonDeterministicCbor",
+            "schemaViolation",
+            "identityBindingMismatch",
+            "invalidRevocationKey",
+            "invalidSignature",
+            "premature",
+            "rootRevoked",
+            "losingRecord",
+            "duplicate",
+            "policyRejected",
+            "rateLimited",
+            "responseTooLarge",
+            "temporarilyUnavailable",
+            "invalidCursor",
+            "internalError"
+          ]
+        }
+      }
+    },
+    {
+      "title": "adapterError",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["runnerProtocol", "caseId", "status", "error", "message"],
+      "properties": {
+        "runnerProtocol": { "const": "1" },
+        "caseId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "status": { "const": "adapterError" },
+        "error": {
+          "type": "string",
+          "pattern": "^(adapter|harness)\\.[A-Za-z][A-Za-z0-9]*(\\.[A-Za-z][A-Za-z0-9]*)*$"
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  ]
+}

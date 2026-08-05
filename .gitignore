@@ -1,0 +1,21 @@
+# Combined ignore rules for the harness and both adapters.
+# The pinned implementation submodules keep their own histories and are
+# never modified here; nothing below may cause writes inside them.
+
+# Rust adapter build output
+/adapters/rust/target/
+
+# Python bytecode (adapters and harness are also run with
+# PYTHONDONTWRITEBYTECODE=1 so nothing is written into the frozen
+# Python submodule)
+__pycache__/
+*.py[cod]
+
+# High-volume scratch output; retained milestone reports are committed
+# explicitly under reports/
+/reports/scratch/
+
+# Editor and OS noise
+*.swp
+*~
+.DS_Store

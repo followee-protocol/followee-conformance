@@ -1,0 +1,19 @@
+[package]
+name = "followee-adapter-rust"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+description = "Neutral runner-protocol adapter for the pinned followee-rs implementation (Milestone 0: hello only)"
+license = "MIT"
+publish = false
+
+[dependencies]
+# The pinned frozen implementation, linked read-only via the Git submodule
+# (HARNESS.md Section 5).  Milestone 0 calls no protocol API; the path
+# dependency proves the frozen core builds from a fresh clone.
+followee = { path = "../../implementations/followee-rs" }
+serde = "1"
+serde_json = "1"
+
+[lints.rust]
+unsafe_code = "forbid"
