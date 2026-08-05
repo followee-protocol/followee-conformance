@@ -32,7 +32,7 @@ def rust_hello_result() -> dict:
         "implementationCommit": pins.RUST_COMMIT,
         "specificationCommit": pins.SPECIFICATION_COMMIT,
         "runnerProtocols": ["1"],
-        "operations": ["hello"],
+        "operations": list(pins.SUPPORTED_OPERATIONS),
     }
 
 
@@ -126,11 +126,11 @@ class VerifyHelloResponseTests(unittest.TestCase):
         result["runnerProtocols"] = ["2"]
         self.assert_symbol(response_with(result), "harness.capabilityMismatch")
 
-    def test_milestone_0_operation_set_is_exact(self):
-        # No Followee protocol operation may be claimed yet (HARNESS.md
-        # Section 20, Milestone 0 acceptance).
+    def test_operation_set_must_match_the_campaign_exactly(self):
+        # The harness refuses adapters whose capabilities do not match the
+        # campaign (HARNESS.md Section 8).
         result = rust_hello_result()
-        result["operations"] = ["hello", "deriveIdentity"]
+        result["operations"] = ["hello"]
         self.assert_symbol(response_with(result), "harness.capabilityMismatch")
 
     def test_unknown_result_member_refused(self):
@@ -211,7 +211,7 @@ class OrchestratorEndToEndTests(unittest.TestCase):
             "implementationCommit": pins.PYTHON_COMMIT,
             "specificationCommit": pins.SPECIFICATION_COMMIT,
             "runnerProtocols": ["1"],
-            "operations": ["hello"],
+            "operations": list(pins.SUPPORTED_OPERATIONS),
         }
 
     def test_correct_pins_complete_both_handshakes(self):

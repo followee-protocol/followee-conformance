@@ -1,5 +1,6 @@
 """Committed-schema validation tests (HARNESS.md Sections 9 and 12)."""
 
+import json
 import unittest
 from pathlib import Path
 
@@ -58,16 +59,26 @@ class RequestSchemaTests(unittest.TestCase):
                 self.schema,
             )
 
-    def test_nonempty_hello_input_rejected(self):
+    def test_operation_outside_the_enum_rejected(self):
         with self.assertRaises(ValidationError):
             validate(
                 {
                     "runnerProtocol": "1",
                     "caseId": "x",
-                    "operation": "hello",
-                    "input": {"seed": "00"},
+                    "operation": "selectCurrent",
+                    "input": {},
                 },
                 self.schema,
+            )
+
+    def test_nonempty_hello_input_rejected_by_operations_schema(self):
+        operations = load_schema(REPO_ROOT, "operations.schema.json")
+        validate({}, operations["$defs"]["helloInput"], root=operations)
+        with self.assertRaises(ValidationError):
+            validate(
+                {"seed": "00"},
+                operations["$defs"]["helloInput"],
+                root=operations,
             )
 
     def test_unpinned_protocol_version_rejected(self):
@@ -383,12 +394,93 @@ class CaseManifestSchemaTests(unittest.TestCase):
                 self.schema,
             )
 
+    def test_expected_result_member_allowed(self):
+        validate(self.manifest(expectedResult={"did": "did:flw:zQm"}), self.schema)
+
     def test_adapter_error_is_never_an_expected_outcome(self):
         with self.assertRaises(ValidationError):
             validate(
                 self.manifest(expected={"outcome": "adapterError"}),
                 self.schema,
             )
+
+
+class OperationsSchemaTests(unittest.TestCase):
+    """The Milestone 1 operation input/result schemas, including the
+    recursive Section 10 typed value tree."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.schema = load_schema(REPO_ROOT, "operations.schema.json")
+
+    def check(self, instance, name):
+        validate(instance, self.schema["$defs"][name], root=self.schema)
+
+    def assert_invalid(self, instance, name):
+        with self.assertRaises(ValidationError):
+            self.check(instance, name)
+
+    def test_derive_identity_input(self):
+        self.check(
+            {"rootSeedHex": "00" * 32, "revocationSeedHex": "ff" * 32},
+            "deriveIdentityInput",
+        )
+        self.assert_invalid(
+            {"rootSeedHex": "00" * 31, "revocationSeedHex": "ff" * 32},
+            "deriveIdentityInput",
+        )
+        self.assert_invalid(
+            {
+                "rootSeedHex": "00" * 32,
+                "revocationSeedHex": "ff" * 32,
+                "extra": True,
+            },
+            "deriveIdentityInput",
+        )
+
+    def test_uppercase_hex_rejected(self):
+        self.assert_invalid(
+            {"rootSeedHex": "AA" * 32, "revocationSeedHex": "ff" * 32},
+            "deriveIdentityInput",
+        )
+
+    def test_recursive_typed_value_tree(self):
+        nested = {
+            "type": "map",
+            "entries": [
+                {
+                    "key": {"type": "uint", "value": "1"},
+                    "value": {
+                        "type": "array",
+                        "items": [
+                            {"type": "nint", "value": "-18446744073709551616"},
+                            {"type": "bytes", "hex": "00ff"},
+                            {"type": "null"},
+                        ],
+                    },
+                }
+            ],
+        }
+        self.check(nested, "typedValue")
+
+    def test_non_canonical_typed_integers_rejected(self):
+        self.assert_invalid({"type": "uint", "value": "01"}, "typedValue")
+        self.assert_invalid({"type": "nint", "value": "-0"}, "typedValue")
+        self.assert_invalid({"type": "uint", "value": "1.5"}, "typedValue")
+
+    def test_unknown_typed_value_type_rejected(self):
+        self.assert_invalid({"type": "float", "value": "1"}, "typedValue")
+
+    def test_corpus_inputs_validate(self):
+        # Every committed specification case input satisfies its schema.
+        cases_dir = REPO_ROOT / "cases" / "specification"
+        checked = 0
+        for path in sorted(cases_dir.glob("*.json")):
+            document = json.loads(path.read_text())
+            name = f"{document['operation']}Input"
+            self.check(document["input"], name)
+            checked += 1
+        self.assertGreater(checked, 50)
 
 
 if __name__ == "__main__":

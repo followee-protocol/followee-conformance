@@ -1,16 +1,15 @@
 //! Neutral runner-protocol v1 adapter core for the pinned `followee-rs`
 //! implementation.
 //!
-//! Milestone 0 supports only the `hello` handshake (HARNESS.md Sections 8
-//! and 20).  This crate contains no Followee parsing, encoding,
-//! cryptography, verification, ordering, or selection logic; it links the
-//! frozen implementation read-only so a fresh clone provably builds it.
+//! Milestone 1 supports `hello`, `deriveIdentity`, `authorRecord`, and
+//! `verifyRecord` (HARNESS.md Sections 8, 9, and 20).  This crate contains
+//! no Followee parsing, encoding, cryptography, verification, ordering, or
+//! selection logic; every protocol decision is delegated to the frozen
+//! implementation's public API through the thin mappings in [`ops`].
 
 #![forbid(unsafe_code)]
 
-// Milestone 0: link the frozen implementation without calling any
-// protocol API (HARNESS.md Section 20, Milestone 0 acceptance).
-use followee as _;
+pub mod ops;
 
 use std::fmt;
 
@@ -227,8 +226,33 @@ fn hello_result(identity: &Identity) -> Value {
         identity.specification_commit.into(),
     );
     result.insert("runnerProtocols".into(), json!([RUNNER_PROTOCOL]));
-    result.insert("operations".into(), json!(["hello"]));
+    result.insert(
+        "operations".into(),
+        json!(["hello", "deriveIdentity", "authorRecord", "verifyRecord"]),
+    );
     Value::Object(result)
+}
+
+fn operation_response(case_id: &str, outcome: Result<Value, ops::OpError>) -> String {
+    match outcome {
+        Ok(result) => json!({
+            "runnerProtocol": RUNNER_PROTOCOL,
+            "caseId": case_id,
+            "status": "accepted",
+            "result": result,
+        })
+        .to_string(),
+        Err(ops::OpError::Rejected { error }) => json!({
+            "runnerProtocol": RUNNER_PROTOCOL,
+            "caseId": case_id,
+            "status": "rejected",
+            "error": error,
+        })
+        .to_string(),
+        Err(ops::OpError::Adapter { symbol, message }) => {
+            adapter_error(RUNNER_PROTOCOL, case_id, symbol, &message)
+        }
+    }
 }
 
 /// Handle one raw request line (without its newline) and return the
@@ -322,11 +346,18 @@ pub fn handle_line(identity: &Identity, raw: &[u8], truncated: bool) -> String {
             })
             .to_string()
         }
+        "deriveIdentity" => {
+            operation_response(&request.case_id, ops::derive_identity(request.input))
+        }
+        "authorRecord" => operation_response(&request.case_id, ops::author_record(request.input)),
+        "verifyRecord" => {
+            operation_response(&request.case_id, ops::verify_record_op(request.input))
+        }
         other => adapter_error(
             RUNNER_PROTOCOL,
             request.case_id.as_str(),
             "adapter.unsupportedOperation",
-            &format!("operation {other:?} is not supported at Milestone 0"),
+            &format!("operation {other:?} is not supported at Milestone 1"),
         ),
     }
 }
@@ -369,7 +400,10 @@ mod tests {
             "abc9a55d90f1026e6509207abda73e5dc6d14241"
         );
         assert_eq!(result["runnerProtocols"], json!(["1"]));
-        assert_eq!(result["operations"], json!(["hello"]));
+        assert_eq!(
+            result["operations"],
+            json!(["hello", "deriveIdentity", "authorRecord", "verifyRecord"])
+        );
     }
 
     #[test]
@@ -450,8 +484,9 @@ mod tests {
 
     #[test]
     fn unsupported_operation_is_refused_not_rejected() {
-        let r =
-            respond(r#"{"runnerProtocol":"1","caseId":"x","operation":"verifyRecord","input":{}}"#);
+        let r = respond(
+            r#"{"runnerProtocol":"1","caseId":"x","operation":"selectCurrent","input":{}}"#,
+        );
         assert_eq!(r["status"], "adapterError");
         assert_eq!(r["error"], "adapter.unsupportedOperation");
     }

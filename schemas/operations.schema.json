@@ -1,0 +1,404 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "operations.schema.json",
+  "title": "Runner protocol v1 operation inputs and results (Milestone 1)",
+  "$comment": "HARNESS.md Sections 9.1-9.3 and 10. Each operation's input and accepted result validate against the $defs entry named <operation>Input / <operation>Result. Protocol integers are canonical decimal strings; binary values are lowercase even-length hexadecimal (HARNESS.md 7.2); adapters additionally enforce the uint64 value range before calling an implementation. The Contact Document and semantic-record representations use one canonical shape in both directions: every member is present, with null / [] / {} standing for an absent CBOR field. Absent and empty extension maps deliberately collapse to {}; byte-exact distinctions remain covered by the compared recordBodyCborHex. Input fields that implementations must judge (URIs, DIDs, media types, language tags, rel values, migration coherence) are deliberately loose here: the schema constrains transport shape only and never pre-decides Followee validity.",
+  "$defs": {
+    "hexBytes": {
+      "type": "string",
+      "pattern": "^([0-9a-f]{2})*$",
+      "maxLength": 262144
+    },
+    "hex32Bytes": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "hex64Bytes": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{128}$"
+    },
+    "uint64": {
+      "$comment": "Canonical decimal; the <= 2^64-1 range is enforced by adapters.",
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,19})$"
+    },
+    "uint64OrNull": {
+      "oneOf": [{ "$ref": "#/$defs/uint64" }, { "type": "null" }]
+    },
+    "canonicalDid": {
+      "$comment": "A canonical v1 Followee DID as produced by an implementation.",
+      "type": "string",
+      "pattern": "^did:flw:z[1-9A-HJ-NP-Za-km-z]+$",
+      "maxLength": 2048
+    },
+    "textOrNull": {
+      "oneOf": [
+        { "type": "string", "maxLength": 16384 },
+        { "type": "null" }
+      ]
+    },
+    "typedKey": {
+      "$comment": "HARNESS.md Section 10: a key inside a nested extension map.",
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "value"],
+          "properties": {
+            "type": { "const": "uint" },
+            "value": { "$ref": "#/$defs/uint64" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "value"],
+          "properties": {
+            "type": { "const": "nint" },
+            "value": {
+              "type": "string",
+              "pattern": "^-[1-9][0-9]{0,19}$"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "value"],
+          "properties": {
+            "type": { "const": "text" },
+            "value": { "type": "string", "maxLength": 16384 }
+          }
+        }
+      ]
+    },
+    "typedValue": {
+      "$comment": "HARNESS.md Section 10 typed value tree. Map entries are arrays in source order so duplicates remain representable.",
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "value"],
+          "properties": {
+            "type": { "const": "uint" },
+            "value": { "$ref": "#/$defs/uint64" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "value"],
+          "properties": {
+            "type": { "const": "nint" },
+            "value": {
+              "type": "string",
+              "pattern": "^-[1-9][0-9]{0,19}$"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "hex"],
+          "properties": {
+            "type": { "const": "bytes" },
+            "hex": { "$ref": "#/$defs/hexBytes" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "value"],
+          "properties": {
+            "type": { "const": "text" },
+            "value": { "type": "string", "maxLength": 16384 }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "value"],
+          "properties": {
+            "type": { "const": "bool" },
+            "value": { "type": "boolean" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type"],
+          "properties": {
+            "type": { "const": "null" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "items"],
+          "properties": {
+            "type": { "const": "array" },
+            "items": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/typedValue" }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "entries"],
+          "properties": {
+            "type": { "const": "map" },
+            "entries": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["key", "value"],
+                "properties": {
+                  "key": { "$ref": "#/$defs/typedKey" },
+                  "value": { "$ref": "#/$defs/typedValue" }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "extensionMap": {
+      "$comment": "Extension map keyed by URI strings; values use the typed tree.",
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/typedValue" },
+      "properties": {}
+    },
+    "serviceEntry": {
+      "$comment": "Semantic fields of specification Section 7.3; exact strings preserved, never normalized.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "endpoint", "mediaType", "label", "language", "rel"],
+      "properties": {
+        "id": { "type": "string", "maxLength": 16384 },
+        "type": { "type": "string", "maxLength": 16384 },
+        "endpoint": { "type": "string", "maxLength": 16384 },
+        "mediaType": { "$ref": "#/$defs/textOrNull" },
+        "label": { "$ref": "#/$defs/textOrNull" },
+        "language": { "$ref": "#/$defs/textOrNull" },
+        "rel": { "$ref": "#/$defs/textOrNull" }
+      }
+    },
+    "migration": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["predecessor", "successor"],
+          "properties": {
+            "predecessor": { "$ref": "#/$defs/textOrNull" },
+            "successor": { "$ref": "#/$defs/textOrNull" }
+          }
+        }
+      ]
+    },
+    "contactDocument": {
+      "$comment": "Canonical runner Contact Document shape (HARNESS.md Section 10). 'summary' is the specification Section 7.1 field the harness brief calls 'bio'.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "displayName",
+        "summary",
+        "avatar",
+        "alsoKnownAs",
+        "services",
+        "migration",
+        "extensions"
+      ],
+      "properties": {
+        "displayName": { "$ref": "#/$defs/textOrNull" },
+        "summary": { "$ref": "#/$defs/textOrNull" },
+        "avatar": { "$ref": "#/$defs/textOrNull" },
+        "alsoKnownAs": {
+          "type": "array",
+          "items": { "type": "string", "maxLength": 16384 }
+        },
+        "services": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/serviceEntry" }
+        },
+        "migration": { "$ref": "#/$defs/migration" },
+        "extensions": { "$ref": "#/$defs/extensionMap" }
+      }
+    },
+    "semanticRecord": {
+      "$comment": "HARNESS.md 9.3: the canonical runner representation of the complete verified semantic record; explicitly mapped from public fields, never a serialized debug object.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocolVersion",
+        "id",
+        "timestampMs",
+        "authority",
+        "authorityDescriptor",
+        "revocationKey",
+        "validUntilMs",
+        "contact",
+        "extensions"
+      ],
+      "properties": {
+        "protocolVersion": { "const": "1" },
+        "id": { "$ref": "#/$defs/canonicalDid" },
+        "timestampMs": { "$ref": "#/$defs/uint64" },
+        "authority": { "enum": ["root", "rootRevoked"] },
+        "authorityDescriptor": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["descriptorVersion", "rootKey", "revocationCommitmentHex"],
+          "properties": {
+            "descriptorVersion": { "const": "1" },
+            "rootKey": { "$ref": "#/$defs/publicKey" },
+            "revocationCommitmentHex": { "$ref": "#/$defs/hex32Bytes" }
+          }
+        },
+        "revocationKey": {
+          "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/publicKey" }]
+        },
+        "validUntilMs": { "$ref": "#/$defs/uint64OrNull" },
+        "contact": { "$ref": "#/$defs/contactDocument" },
+        "extensions": { "$ref": "#/$defs/extensionMap" }
+      }
+    },
+    "publicKey": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["suite", "publicKeyHex"],
+      "properties": {
+        "suite": { "const": "-19" },
+        "publicKeyHex": { "$ref": "#/$defs/hex32Bytes" }
+      }
+    },
+    "helloInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {}
+    },
+    "deriveIdentityInput": {
+      "$comment": "HARNESS.md 9.1. Public test seeds only; never a general secret-key service.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rootSeedHex", "revocationSeedHex"],
+      "properties": {
+        "rootSeedHex": { "$ref": "#/$defs/hex32Bytes" },
+        "revocationSeedHex": { "$ref": "#/$defs/hex32Bytes" }
+      }
+    },
+    "deriveIdentityResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rootPublicKeyHex",
+        "revocationPublicKeyHex",
+        "revocationPublicKeyCborHex",
+        "revocationCommitmentHex",
+        "authorityDescriptorCborHex",
+        "authorityDescriptorDigestHex",
+        "did"
+      ],
+      "properties": {
+        "rootPublicKeyHex": { "$ref": "#/$defs/hex32Bytes" },
+        "revocationPublicKeyHex": { "$ref": "#/$defs/hex32Bytes" },
+        "revocationPublicKeyCborHex": { "$ref": "#/$defs/hexBytes" },
+        "revocationCommitmentHex": { "$ref": "#/$defs/hex32Bytes" },
+        "authorityDescriptorCborHex": { "$ref": "#/$defs/hexBytes" },
+        "authorityDescriptorDigestHex": { "$ref": "#/$defs/hex32Bytes" },
+        "did": { "$ref": "#/$defs/canonicalDid" },
+        "diagnostic": { "type": "object" }
+      }
+    },
+    "authorRecordInput": {
+      "$comment": "HARNESS.md 9.2. The adapter derives descriptor and DID from the seeds, creates the complete record through the implementation's typed authoring path, and signs with the named seed. An incoherent authority/signingSeed pairing is refused as a runner input-contract violation (adapterError), never silently re-keyed.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rootSeedHex",
+        "revocationSeedHex",
+        "authority",
+        "timestampMs",
+        "validUntilMs",
+        "contact",
+        "extensions",
+        "signingSeed"
+      ],
+      "properties": {
+        "rootSeedHex": { "$ref": "#/$defs/hex32Bytes" },
+        "revocationSeedHex": { "$ref": "#/$defs/hex32Bytes" },
+        "authority": { "enum": ["root", "rootRevoked"] },
+        "timestampMs": { "$ref": "#/$defs/uint64" },
+        "validUntilMs": { "$ref": "#/$defs/uint64OrNull" },
+        "contact": { "$ref": "#/$defs/contactDocument" },
+        "extensions": { "$ref": "#/$defs/extensionMap" },
+        "signingSeed": { "enum": ["root", "revocation"] }
+      }
+    },
+    "authorRecordResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "did",
+        "recordBodyCborHex",
+        "recordBodyDigestHex",
+        "sigStructureHex",
+        "signatureHex",
+        "envelopeHex"
+      ],
+      "properties": {
+        "did": { "$ref": "#/$defs/canonicalDid" },
+        "recordBodyCborHex": { "$ref": "#/$defs/hexBytes" },
+        "recordBodyDigestHex": { "$ref": "#/$defs/hex32Bytes" },
+        "sigStructureHex": { "$ref": "#/$defs/hexBytes" },
+        "signatureHex": { "$ref": "#/$defs/hex64Bytes" },
+        "envelopeHex": { "$ref": "#/$defs/hexBytes" },
+        "diagnostic": { "type": "object" }
+      }
+    },
+    "verifyRecordInput": {
+      "$comment": "HARNESS.md 9.3. targetDid is deliberately unconstrained beyond transport shape: malformed targets are legitimate negative-case inputs classified by the implementations.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["targetDid", "envelopeHex", "nowMs"],
+      "properties": {
+        "targetDid": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "envelopeHex": { "$ref": "#/$defs/hexBytes" },
+        "nowMs": { "$ref": "#/$defs/uint64" }
+      }
+    },
+    "verifyRecordResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "envelopeHex",
+        "recordBodyCborHex",
+        "recordBodyDigestHex",
+        "id",
+        "timestampMs",
+        "authority",
+        "validUntilMs",
+        "premature",
+        "stale",
+        "record"
+      ],
+      "properties": {
+        "envelopeHex": { "$ref": "#/$defs/hexBytes" },
+        "recordBodyCborHex": { "$ref": "#/$defs/hexBytes" },
+        "recordBodyDigestHex": { "$ref": "#/$defs/hex32Bytes" },
+        "id": { "$ref": "#/$defs/canonicalDid" },
+        "timestampMs": { "$ref": "#/$defs/uint64" },
+        "authority": { "enum": ["root", "rootRevoked"] },
+        "validUntilMs": { "$ref": "#/$defs/uint64OrNull" },
+        "premature": { "type": "boolean" },
+        "stale": { "type": "boolean" },
+        "record": { "$ref": "#/$defs/semanticRecord" },
+        "diagnostic": { "type": "object" }
+      }
+    }
+  }
+}

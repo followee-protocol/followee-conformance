@@ -5,9 +5,12 @@ Followee protocol implementations. The governing implementation brief is
 [HARNESS.md](HARNESS.md); this README covers setup and the commands for
 the current milestone.
 
-**Status: Milestone 0 (neutral scaffold).** The harness verifies every
-pinned revision and completes the `hello` handshake with both adapters.
-No Followee protocol operation is claimed yet.
+**Status: Milestone 1 (identity, authoring, and verification).** The
+harness verifies every pinned revision, completes both handshakes, and
+runs the specification-status differential corpus (Appendix B, B.7, B.8)
+for `deriveIdentity`, `authorRecord`, and `verifyRecord` against both
+frozen implementations. Selection, primitive operations, and generated
+campaigns are later milestones.
 
 ## Frozen targets
 
@@ -46,13 +49,24 @@ cargo build --manifest-path adapters/rust/Cargo.toml --locked
 After checkout and dependency installation, everything below runs without
 network access.
 
-## Running the Milestone 0 gate
+## Running the gates
 
 ```sh
-# Integrity checks + both hello handshakes, refusing incorrect pins
+# Milestone 0: integrity checks + both hello handshakes
 python3 -m harness.orchestrator
 
-# Harness unit tests (JSONL framing, schemas, integrity, supervision)
+# Milestone 1: the specification-status differential campaign
+# (identical neutral inputs to both adapters, Section 13 comparison),
+# plus the chained validUntil/stale scenario, whose intermediate
+# envelope is run-time implementation output admitted only after both
+# authorRecord results agree byte-for-byte (harness/chained.py)
+python3 -m harness.campaign
+
+# The committed corpus must match its builder byte-for-byte
+python3 scripts/build_specification_corpus.py --check
+
+# Harness unit tests (framing, schemas, integrity, supervision,
+# comparator sensitivity, campaign end-to-end)
 python3 -m unittest discover -s harness/tests -t .
 
 # Python adapter tests
@@ -64,6 +78,11 @@ cargo test --manifest-path adapters/rust/Cargo.toml --locked
 # Negative integrity test: a wrong implementation commit must be refused
 sh scripts/negative_pin_test.sh
 ```
+
+Disagreement artifacts and scratch summaries are written under
+`reports/scratch/` (ignored); each artifact contains the exact request,
+both responses, adapter stderr excerpts, every pinned revision, and a
+single-case reproduction command (HARNESS.md Section 16).
 
 ## Layout
 

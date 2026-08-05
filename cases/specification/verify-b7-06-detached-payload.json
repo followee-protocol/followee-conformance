@@ -1,0 +1,28 @@
+{
+  "id": "verify-b7-06-detached-payload",
+  "runnerProtocol": "1",
+  "operation": "verifyRecord",
+  "specificationCommit": "abc9a55d90f1026e6509207abda73e5dc6d14241",
+  "specificationSections": [
+    "Section 6.2",
+    "Appendix B.7 item 6"
+  ],
+  "derivationStatus": "specification",
+  "faultProfile": "single",
+  "expected": {
+    "outcome": "rejected",
+    "errorAssertion": "unspecified"
+  },
+  "input": {
+    "targetDid": "did:flw:zQmPcGstBa7wW9hoYQbS6JZ4UxwZmoKr7YVf9y7qxiyD3Cm",
+    "envelopeHex": "d28443a10132a0f658404db146d7bc6ca7690bac44b0c6ef38bcdd685ff157fdcca15da6b64662a26f94bd95b88f97f3e720246b3756c6eb6b8967103f9346dbef51c053cac381a50204",
+    "nowMs": "1785589200123"
+  },
+  "derivedFrom": {
+    "baseVector": "verify-b4-root",
+    "mutation": "attached payload replaced with null (f6), producing a detached-payload envelope",
+    "protectedBytesChanged": false,
+    "payloadBytesChanged": true,
+    "resigned": false
+  }
+}

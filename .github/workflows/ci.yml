@@ -94,3 +94,7 @@ jobs:
         run: python3 -m harness.orchestrator
       - name: wrong implementation commit is refused
         run: sh scripts/negative_pin_test.sh
+      - name: specification corpus matches its builder (no drift)
+        run: python3 scripts/build_specification_corpus.py --check
+      - name: specification-status differential campaign
+        run: python3 -m harness.campaign

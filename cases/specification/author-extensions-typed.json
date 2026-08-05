@@ -1,0 +1,106 @@
+{
+  "id": "author-extensions-typed",
+  "runnerProtocol": "1",
+  "operation": "authorRecord",
+  "specificationCommit": "abc9a55d90f1026e6509207abda73e5dc6d14241",
+  "specificationSections": [
+    "Section 5.6",
+    "Section 7.5"
+  ],
+  "derivationStatus": "specification",
+  "faultProfile": "none",
+  "expected": {
+    "outcome": "accepted"
+  },
+  "input": {
+    "rootSeedHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+    "revocationSeedHex": "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+    "authority": "root",
+    "timestampMs": "1785589200123",
+    "validUntilMs": null,
+    "contact": {
+      "displayName": "Alice Example",
+      "summary": "Writer",
+      "avatar": null,
+      "alsoKnownAs": [
+        "acct:alice@example.com"
+      ],
+      "services": [
+        {
+          "id": "feed",
+          "type": "Feed",
+          "endpoint": "https://alice.example/feed.xml",
+          "mediaType": "application/atom+xml",
+          "label": "Writing",
+          "language": null,
+          "rel": null
+        }
+      ],
+      "migration": null,
+      "extensions": {
+        "https://ext.example/contact": {
+          "type": "text",
+          "value": "contact-level"
+        }
+      }
+    },
+    "extensions": {
+      "https://ext.example/record": {
+        "type": "map",
+        "entries": [
+          {
+            "key": {
+              "type": "uint",
+              "value": "1"
+            },
+            "value": {
+              "type": "text",
+              "value": "one"
+            }
+          },
+          {
+            "key": {
+              "type": "nint",
+              "value": "-1"
+            },
+            "value": {
+              "type": "bytes",
+              "hex": "00ff"
+            }
+          },
+          {
+            "key": {
+              "type": "text",
+              "value": "flag"
+            },
+            "value": {
+              "type": "bool",
+              "value": true
+            }
+          }
+        ]
+      },
+      "https://ext.example/list": {
+        "type": "array",
+        "items": [
+          {
+            "type": "uint",
+            "value": "18446744073709551615"
+          },
+          {
+            "type": "nint",
+            "value": "-18446744073709551616"
+          },
+          {
+            "type": "null"
+          },
+          {
+            "type": "text",
+            "value": "text"
+          }
+        ]
+      }
+    },
+    "signingSeed": "root"
+  }
+}

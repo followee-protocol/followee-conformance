@@ -7,7 +7,10 @@ subset of JSON Schema keywords those schemas use:
 
     type (string, boolean, object, array, null), enum, const, pattern,
     minLength, maxLength, properties, required, additionalProperties
-    (boolean false only), items, minItems, maxItems, uniqueItems, oneOf.
+    (boolean, or a schema applied to unlisted members), items, minItems,
+    maxItems, uniqueItems, oneOf, $defs, and document-local $ref of the
+    form "#/$defs/<name>" (recursion terminates because instances are
+    finite).
 
 Numeric instance types are deliberately unsupported: the runner JSON
 profile forbids bare numbers (HARNESS.md 7.2).  Annotation keywords
@@ -38,6 +41,8 @@ _SUPPORTED = _ANNOTATIONS | {
     "maxItems",
     "uniqueItems",
     "oneOf",
+    "$defs",
+    "$ref",
 }
 
 _TYPES = {
@@ -88,19 +93,42 @@ def _check_type(value: Any, expected: str, path: str) -> None:
         raise ValidationError(path, f"expected {expected}, got {_type_name(value)}")
 
 
-def validate(instance: Any, schema: dict[str, Any], path: str = "") -> None:
+def _resolve_ref(ref: Any, root: dict[str, Any], path: str) -> dict[str, Any]:
+    if not isinstance(ref, str) or not ref.startswith("#/$defs/"):
+        raise SchemaError(f"unsupported $ref {ref!r} at {path or '$'}")
+    name = ref[len("#/$defs/") :]
+    defs = root.get("$defs", {})
+    if name not in defs:
+        raise SchemaError(f"$ref to undefined $defs entry {name!r}")
+    return defs[name]
+
+
+def validate(
+    instance: Any,
+    schema: dict[str, Any],
+    path: str = "",
+    root: dict[str, Any] | None = None,
+) -> None:
     """Validate ``instance`` against the supported schema subset.
 
-    Raises ValidationError on instance mismatch and SchemaError when the
-    schema uses anything outside the supported subset.
+    ``root`` is the document against which "#/$defs/<name>" references
+    resolve; it defaults to ``schema`` itself.  Raises ValidationError on
+    instance mismatch and SchemaError when the schema uses anything
+    outside the supported subset.
     """
     if not isinstance(schema, dict):
         raise SchemaError(f"schema at {path or '$'} is not an object")
+    if root is None:
+        root = schema
     unsupported = set(schema) - _SUPPORTED
     if unsupported:
         raise SchemaError(
             f"unsupported schema keywords at {path or '$'}: {sorted(unsupported)}"
         )
+
+    if "$ref" in schema:
+        validate(instance, _resolve_ref(schema["$ref"], root, path), path, root)
+        return
 
     if "oneOf" in schema:
         branches = schema["oneOf"]
@@ -110,7 +138,7 @@ def validate(instance: Any, schema: dict[str, Any], path: str = "") -> None:
         errors: list[str] = []
         for i, branch in enumerate(branches):
             try:
-                validate(instance, branch, path)
+                validate(instance, branch, path, root)
             except ValidationError as exc:
                 errors.append(f"branch {i}: {exc}")
             else:
@@ -148,17 +176,19 @@ def validate(instance: Any, schema: dict[str, Any], path: str = "") -> None:
         for name in schema.get("required", []):
             if name not in instance:
                 raise ValidationError(path, f"missing required member {name!r}")
-        if schema.get("additionalProperties", True) is False:
+        additional = schema.get("additionalProperties", True)
+        if additional is False:
             extra = set(instance) - set(properties)
             if extra:
                 raise ValidationError(path, f"unknown object members {sorted(extra)}")
-        elif "additionalProperties" in schema and (
-            schema["additionalProperties"] is not True
-        ):
-            raise SchemaError("additionalProperties must be boolean in this subset")
+        elif isinstance(additional, dict):
+            for name in set(instance) - set(properties):
+                validate(instance[name], additional, f"{path}.{name}", root)
+        elif additional is not True:
+            raise SchemaError("additionalProperties must be boolean or a schema object")
         for name, subschema in properties.items():
             if name in instance:
-                validate(instance[name], subschema, f"{path}.{name}")
+                validate(instance[name], subschema, f"{path}.{name}", root)
 
     if isinstance(instance, list):
         if "minItems" in schema and len(instance) < schema["minItems"]:
@@ -177,7 +207,7 @@ def validate(instance: Any, schema: dict[str, Any], path: str = "") -> None:
                 seen.append(item)
         if "items" in schema:
             for i, item in enumerate(instance):
-                validate(item, schema["items"], f"{path}[{i}]")
+                validate(item, schema["items"], f"{path}[{i}]", root)
 
 
 def schemas_dir(repo_root: Path) -> Path:

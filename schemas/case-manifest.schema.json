@@ -186,6 +186,10 @@
         }
       ]
     },
+    "expectedResult": {
+      "$comment": "Present only for specification-status cases whose exact expected result members are normatively published by the pinned specification (HARNESS.md Section 12). Every member listed here must equal the corresponding member of the agreed accepted result; members not listed remain compared only across implementations.",
+      "type": "object"
+    },
     "producedBy": {
       "enum": ["followee-rs", "followee-python-cleanroom"]
     },

@@ -1,0 +1,28 @@
+{
+  "id": "derive-identity-attacker",
+  "runnerProtocol": "1",
+  "operation": "deriveIdentity",
+  "specificationCommit": "abc9a55d90f1026e6509207abda73e5dc6d14241",
+  "specificationSections": [
+    "Section 4.2",
+    "Section 4.3",
+    "Appendix B.8.1"
+  ],
+  "derivationStatus": "specification",
+  "faultProfile": "none",
+  "expected": {
+    "outcome": "accepted"
+  },
+  "input": {
+    "rootSeedHex": "404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f",
+    "revocationSeedHex": "606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f"
+  },
+  "expectedResult": {
+    "rootPublicKeyHex": "2543b92ff1095511476adc8369db6ddc933665a11978dda1404ee1066ca9559d",
+    "revocationPublicKeyHex": "174553b456dddfc6908ecab1c101fe6ab21e2baa0617795b7d43a63482993fd5",
+    "revocationPublicKeyCborHex": "a20032015820174553b456dddfc6908ecab1c101fe6ab21e2baa0617795b7d43a63482993fd5",
+    "revocationCommitmentHex": "2a35f76c8bcc0c5fc69e99d51656c2a93a1c8e447677d6f78c8c9d729eef3ca6",
+    "authorityDescriptorCborHex": "a3000101a200320158202543b92ff1095511476adc8369db6ddc933665a11978dda1404ee1066ca9559d0258202a35f76c8bcc0c5fc69e99d51656c2a93a1c8e447677d6f78c8c9d729eef3ca6",
+    "did": "did:flw:zQmPdjR6k8HFgbf4e51P7iMy4aY3buGsxQU49fSHdGhce7s"
+  }
+}

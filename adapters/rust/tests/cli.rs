@@ -44,7 +44,10 @@ fn hello_handshake_roundtrip() {
     let r = &responses[0];
     assert_eq!(r["status"], "accepted");
     assert_eq!(r["caseId"], "handshake");
-    assert_eq!(r["result"]["operations"], serde_json::json!(["hello"]));
+    assert_eq!(
+        r["result"]["operations"],
+        serde_json::json!(["hello", "deriveIdentity", "authorRecord", "verifyRecord"])
+    );
     let commit = r["result"]["implementationCommit"].as_str().unwrap();
     assert_eq!(commit.len(), 40);
 }

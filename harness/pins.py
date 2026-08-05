@@ -107,6 +107,12 @@ PYTHON_ADAPTER_PIN = AdapterPin(
     implementation_commit=PYTHON_COMMIT,
 )
 
-# Milestone 0: adapters support exactly this operation set.  No Followee
-# protocol operation is claimed yet (HARNESS.md Section 20, Milestone 0).
-MILESTONE_0_OPERATIONS = ("hello",)
+# Milestone 1: adapters support exactly this operation set (HARNESS.md
+# Section 20, Milestone 1).  The harness refuses adapters whose reported
+# capabilities differ from the campaign's requirements (Section 8).
+SUPPORTED_OPERATIONS = (
+    "hello",
+    "deriveIdentity",
+    "authorRecord",
+    "verifyRecord",
+)

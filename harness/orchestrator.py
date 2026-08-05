@@ -139,11 +139,11 @@ def verify_hello_response(
             f"adapter does not speak runner protocol "
             f"{pins.RUNNER_PROTOCOL!r}: {result['runnerProtocols']!r}",
         )
-    if tuple(result["operations"]) != pins.MILESTONE_0_OPERATIONS:
+    if tuple(result["operations"]) != pins.SUPPORTED_OPERATIONS:
         raise HandshakeFailure(
             "harness.capabilityMismatch",
-            "Milestone 0 requires the operation set "
-            f"{list(pins.MILESTONE_0_OPERATIONS)!r}, adapter reports "
+            "this campaign requires the operation set "
+            f"{list(pins.SUPPORTED_OPERATIONS)!r}, adapter reports "
             f"{result['operations']!r}",
         )
     return result
