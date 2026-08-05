@@ -125,35 +125,66 @@
       ]
     },
     "derivedFrom": {
-      "$comment": "Present only for derived negative cases.",
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "baseVector",
-        "mutation",
-        "protectedBytesChanged",
-        "payloadBytesChanged",
-        "resigned"
-      ],
-      "properties": {
-        "baseVector": {
-          "type": "string",
-          "minLength": 1,
-          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+      "$comment": "Present only for derived negative cases. resignedKey (the published test key used for re-signing) is required exactly when resigned is true and forbidden when resigned is false.",
+      "oneOf": [
+        {
+          "title": "re-signed derivation",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "baseVector",
+            "mutation",
+            "protectedBytesChanged",
+            "payloadBytesChanged",
+            "resigned",
+            "resignedKey"
+          ],
+          "properties": {
+            "baseVector": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+            },
+            "mutation": {
+              "type": "string",
+              "minLength": 1
+            },
+            "protectedBytesChanged": { "type": "boolean" },
+            "payloadBytesChanged": { "type": "boolean" },
+            "resigned": { "const": true },
+            "resignedKey": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
         },
-        "mutation": {
-          "type": "string",
-          "minLength": 1
-        },
-        "protectedBytesChanged": { "type": "boolean" },
-        "payloadBytesChanged": { "type": "boolean" },
-        "resigned": { "type": "boolean" },
-        "resignedKey": {
-          "$comment": "Published test key name used for re-signing.",
-          "type": "string",
-          "minLength": 1
+        {
+          "title": "derivation without re-signing",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "baseVector",
+            "mutation",
+            "protectedBytesChanged",
+            "payloadBytesChanged",
+            "resigned"
+          ],
+          "properties": {
+            "baseVector": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+            },
+            "mutation": {
+              "type": "string",
+              "minLength": 1
+            },
+            "protectedBytesChanged": { "type": "boolean" },
+            "payloadBytesChanged": { "type": "boolean" },
+            "resigned": { "const": false }
+          }
         }
-      }
+      ]
     },
     "producedBy": {
       "enum": ["followee-rs", "followee-python-cleanroom"]

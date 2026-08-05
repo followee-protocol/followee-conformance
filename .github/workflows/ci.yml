@@ -48,9 +48,9 @@ jobs:
           fetch-depth: 0
       - name: adapter unit and process tests
         run: python3 -m unittest discover -s adapters/python/tests -t . -v
-      - name: python lint (ruff)
+      - name: python lint (ruff, pinned)
         run: |
-          python3 -m pip install --quiet ruff
+          python3 -m pip install --quiet ruff==0.16.1
           ruff check harness adapters/python scripts
           ruff format --check harness adapters/python scripts
 
@@ -62,8 +62,11 @@ jobs:
         with:
           submodules: recursive
           fetch-depth: 0
-      - uses: dtolnay/rust-toolchain@stable
+      # Same toolchain as the frozen Rust implementation's pin (see
+      # rust-toolchain.toml at the repository root), not a floating stable.
+      - uses: dtolnay/rust-toolchain@master
         with:
+          toolchain: 1.97.1
           components: rustfmt, clippy
       - name: format
         run: cargo fmt --manifest-path adapters/rust/Cargo.toml -- --check
@@ -82,7 +85,9 @@ jobs:
         with:
           submodules: recursive
           fetch-depth: 0
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.97.1
       - name: build rust adapter
         run: cargo build --manifest-path adapters/rust/Cargo.toml --locked
       - name: orchestrator completes both handshakes

@@ -1,0 +1,8 @@
+# Pinned to the same toolchain as the frozen Rust implementation
+# (implementations/followee-rs/rust-toolchain.toml) so the adapter, CI, and
+# reviewers compile, format, and lint with identical tool versions instead
+# of a floating stable. Bump deliberately in its own change together with
+# the frozen implementation's pin, then rerun the complete Milestone gate.
+[toolchain]
+channel = "1.97.1"
+components = ["rustfmt", "clippy"]

@@ -4,6 +4,7 @@ infrastructure failure with a stable harness.* symbol (HARNESS.md 7.1, 18,
 
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -76,6 +77,25 @@ class AdapterProcessTests(unittest.TestCase):
     def test_timeout_is_harness_failure(self):
         self.assert_failure("timeout", "harness.timeout", timeout=0.5)
 
+    def test_send_side_timeout_when_adapter_never_reads_stdin(self):
+        # The request timeout covers delivering the request bytes too: a
+        # large valid request to an adapter that never reads stdin fills
+        # the pipe and must surface as harness.timeout within the
+        # configured deadline, not block the harness.
+        proc = self.spawn("never-reads", timeout=0.5)
+        big_request = {
+            "runnerProtocol": "1",
+            "caseId": "big",
+            "operation": "hello",
+            "input": {"pad": "a" * 600_000},
+        }
+        started = time.monotonic()
+        with self.assertRaises(AdapterFailure) as ctx:
+            proc.request(big_request)
+        elapsed = time.monotonic() - started
+        self.assertEqual(ctx.exception.symbol, "harness.timeout")
+        self.assertLess(elapsed, 5.0, "deadline supervision on the write side")
+
     def test_crash_is_harness_failure_with_stderr_excerpt(self):
         failure = self.assert_failure("crash", "harness.adapterExited")
         self.assertIn("panic: something went wrong", failure.stderr_excerpt)
@@ -85,6 +105,22 @@ class AdapterProcessTests(unittest.TestCase):
 
     def test_extra_output_after_response_is_harness_failure(self):
         self.assert_failure("extra-output", "harness.extraOutput")
+
+    def test_blank_line_after_response_is_extra_output(self):
+        # Whitespace after the response line is extra output too: every
+        # byte beyond the single response line counts.
+        self.assert_failure("trailing-blank-line", "harness.extraOutput")
+
+    def test_spaces_after_response_are_extra_output(self):
+        self.assert_failure("trailing-spaces", "harness.extraOutput")
+
+    def test_output_arriving_at_shutdown_is_extra_output(self):
+        proc = self.spawn("output-at-shutdown")
+        response = proc.request(HELLO)
+        self.assertEqual(response["status"], "accepted")
+        with self.assertRaises(AdapterFailure) as ctx:
+            proc.shutdown()
+        self.assertEqual(ctx.exception.symbol, "harness.extraOutput")
 
     def test_hang_after_stdin_close_is_harness_failure(self):
         proc = self.spawn("hang-on-shutdown")

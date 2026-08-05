@@ -9,7 +9,7 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-fn git(dir: &Path, args: &[&str]) -> String {
+fn git_maybe(dir: &Path, args: &[&str]) -> Option<String> {
     let output = Command::new("git")
         .arg("-C")
         .arg(dir)
@@ -17,17 +17,18 @@ fn git(dir: &Path, args: &[&str]) -> String {
         .output()
         .unwrap_or_else(|e| panic!("failed to run git in {}: {e}", dir.display()));
     if !output.status.success() {
-        panic!(
-            "git {:?} failed in {}: {}",
-            args,
-            dir.display(),
-            String::from_utf8_lossy(&output.stderr)
-        );
+        return None;
     }
-    String::from_utf8(output.stdout)
-        .expect("git output was not UTF-8")
-        .trim()
-        .to_string()
+    Some(
+        String::from_utf8(output.stdout)
+            .expect("git output was not UTF-8")
+            .trim()
+            .to_string(),
+    )
+}
+
+fn git(dir: &Path, args: &[&str]) -> String {
+    git_maybe(dir, args).unwrap_or_else(|| panic!("git {:?} failed in {}", args, dir.display()))
 }
 
 fn head_commit(dir: &Path) -> String {
@@ -53,9 +54,23 @@ fn main() {
     println!("cargo:rustc-env=FOLLOWEE_IMPL_COMMIT={impl_commit}");
     println!("cargo:rustc-env=FOLLOWEE_SPEC_COMMIT={spec_commit}");
 
-    // Rebuild whenever either checkout moves.
+    // Rebuild whenever either checkout moves.  A detached HEAD stores the
+    // commit directly in HEAD; a symbolic HEAD stores only the branch name,
+    // so the branch's loose ref file and packed-refs must be watched too
+    // (only existing paths are emitted: a missing rerun-if-changed path
+    // would force a rebuild on every invocation).
     for dir in [&impl_dir, &spec_dir] {
-        let git_dir = git(dir, &["rev-parse", "--absolute-git-dir"]);
-        println!("cargo:rerun-if-changed={git_dir}/HEAD");
+        let git_dir = PathBuf::from(git(dir, &["rev-parse", "--absolute-git-dir"]));
+        watch_if_exists(&git_dir.join("HEAD"));
+        if let Some(branch_ref) = git_maybe(dir, &["symbolic-ref", "-q", "HEAD"]) {
+            watch_if_exists(&git_dir.join(&branch_ref));
+            watch_if_exists(&git_dir.join("packed-refs"));
+        }
+    }
+}
+
+fn watch_if_exists(path: &Path) {
+    if path.exists() {
+        println!("cargo:rerun-if-changed={}", path.display());
     }
 }

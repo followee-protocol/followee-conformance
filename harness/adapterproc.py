@@ -85,6 +85,10 @@ class AdapterProcess:
                     f"could not start {self.name} adapter: {exc}",
                 ) from exc
         os.set_blocking(self._proc.stdout.fileno(), False)
+        # stdin is written under the same deadline supervision as reads: an
+        # adapter that never drains its stdin pipe must surface as a
+        # timeout, not block the harness forever.
+        os.set_blocking(self._proc.stdin.fileno(), False)
 
     def stderr_excerpt(self) -> str:
         try:
@@ -141,25 +145,56 @@ class AdapterProcess:
         finally:
             sel.close()
 
+    def _write_line(self, data: bytes, deadline: float) -> None:
+        """Write one request line within the deadline (non-blocking fd)."""
+        proc = self._proc
+        assert proc is not None and proc.stdin is not None
+        fd = proc.stdin.fileno()
+        sel = selectors.DefaultSelector()
+        sel.register(proc.stdin, selectors.EVENT_WRITE)
+        view = memoryview(data)
+        offset = 0
+        try:
+            while offset < len(view):
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    self.kill()
+                    raise self._fail(
+                        "harness.timeout",
+                        f"{self.name} did not accept the request within "
+                        f"{self.timeout} seconds",
+                    )
+                events = sel.select(min(remaining, 0.25))
+                if not events:
+                    continue
+                try:
+                    offset += os.write(fd, view[offset : offset + 65536])
+                except BlockingIOError:
+                    continue
+                except (BrokenPipeError, OSError):
+                    code = proc.poll()
+                    self.kill()
+                    raise self._fail(
+                        "harness.adapterExited",
+                        f"{self.name} closed stdin (exit status {code})",
+                    ) from None
+        finally:
+            sel.close()
+
     def request(self, obj: dict[str, Any]) -> dict[str, Any]:
-        """Send one request line and return the parsed response object."""
+        """Send one request line and return the parsed response object.
+
+        ``timeout`` covers the complete exchange: both delivering the
+        request bytes and receiving the response line.
+        """
         proc = self._proc
         if proc is None or proc.stdin is None:
             raise AdapterFailure(
                 "harness.adapterNotRunning", f"{self.name} is not running"
             )
         line = dumps_line(obj)
-        try:
-            proc.stdin.write(line)
-            proc.stdin.flush()
-        except (BrokenPipeError, OSError):
-            code = proc.poll()
-            self.kill()
-            raise self._fail(
-                "harness.adapterExited",
-                f"{self.name} closed stdin (exit status {code})",
-            ) from None
         deadline = time.monotonic() + self.timeout
+        self._write_line(line, deadline)
         raw = self._read_line(deadline)
         try:
             response = loads_line(raw)
@@ -169,9 +204,9 @@ class AdapterProcess:
                 f"harness.{exc.symbol}",
                 f"{self.name} response violates the JSON profile: {exc.message}",
             ) from exc
-        # Anything already buffered beyond the single response line is
-        # unexpected extra output (HARNESS.md 7.1).
-        if self._buffer.strip():
+        # Every byte already buffered beyond the single response line is
+        # unexpected extra output (HARNESS.md 7.1), whitespace included.
+        if self._buffer:
             extra = self._buffer[:200]
             self.kill()
             raise self._fail(
@@ -212,7 +247,9 @@ class AdapterProcess:
                 "harness.shutdownTimeout",
                 f"{self.name} did not exit within {grace} seconds of stdin closing",
             )
-        if trailing.strip():
+        # Every byte after the final response line counts, whitespace
+        # included, whether buffered earlier or arriving at shutdown.
+        if trailing:
             raise self._fail(
                 "harness.extraOutput",
                 f"{self.name} produced unexpected output at shutdown: "

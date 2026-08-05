@@ -332,6 +332,57 @@ class CaseManifestSchemaTests(unittest.TestCase):
         with self.assertRaises(ValidationError):
             validate(self.manifest(specificationCommit="0" * 40), self.schema)
 
+    @staticmethod
+    def derived_from(resigned: bool, key: str | None) -> dict:
+        derivation = {
+            "baseVector": "appendix-b4",
+            "mutation": "flip byte 17 of the protected header",
+            "protectedBytesChanged": True,
+            "payloadBytesChanged": False,
+            "resigned": resigned,
+        }
+        if key is not None:
+            derivation["resignedKey"] = key
+        return derivation
+
+    def rejected_manifest_with(self, derivation: dict) -> dict:
+        return self.manifest(
+            faultProfile="single",
+            expected={
+                "outcome": "rejected",
+                "errorAssertion": "unspecified",
+            },
+            derivedFrom=derivation,
+        )
+
+    def test_resigned_derivation_with_key_valid(self):
+        validate(
+            self.rejected_manifest_with(self.derived_from(True, "test-root-seed-1")),
+            self.schema,
+        )
+
+    def test_unsigned_derivation_without_key_valid(self):
+        validate(
+            self.rejected_manifest_with(self.derived_from(False, None)),
+            self.schema,
+        )
+
+    def test_resigned_true_requires_resigned_key(self):
+        with self.assertRaises(ValidationError):
+            validate(
+                self.rejected_manifest_with(self.derived_from(True, None)),
+                self.schema,
+            )
+
+    def test_resigned_false_forbids_resigned_key(self):
+        with self.assertRaises(ValidationError):
+            validate(
+                self.rejected_manifest_with(
+                    self.derived_from(False, "test-root-seed-1")
+                ),
+                self.schema,
+            )
+
     def test_adapter_error_is_never_an_expected_outcome(self):
         with self.assertRaises(ValidationError):
             validate(

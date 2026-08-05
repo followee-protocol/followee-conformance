@@ -40,6 +40,7 @@ class Fixture:
         self.tmp = tmp
         upstream = tmp / "upstream"
         upstream.mkdir()
+        self.upstream_url = str(upstream)
         git(upstream, "init", "--quiet", "--initial-branch=main")
         (upstream / "file.txt").write_text("first\n")
         git(upstream, "add", "file.txt")
@@ -61,7 +62,7 @@ class Fixture:
     def pin(self, **overrides) -> SubmodulePin:
         values = {
             "path": "sub",
-            "repository": "ignored",
+            "repository": self.upstream_url,
             "commit": self.pinned_commit,
             "tags": {
                 "frozen-v1": self.pinned_commit,
@@ -107,6 +108,46 @@ class IntegrityTests(unittest.TestCase):
         (self.fx.subdir / "stray.txt").write_text("stray\n")
         failures = check_submodule(self.fx.root, self.fx.pin())
         self.assertIn("harness.integrity.dirtySubmodule", self.symbols(failures))
+
+    def test_gitmodules_url_mismatch_refused(self):
+        # Only the .gitmodules record is wrong; origin still matches.
+        git(
+            self.fx.root,
+            "config",
+            "--file",
+            ".gitmodules",
+            "submodule.sub.url",
+            "https://example.invalid/other.git",
+        )
+        failures = check_submodule(self.fx.root, self.fx.pin())
+        symbols = self.symbols(failures)
+        self.assertIn("harness.integrity.gitmodulesUrlMismatch", symbols)
+        self.assertNotIn("harness.integrity.originUrlMismatch", symbols)
+
+    def test_missing_gitmodules_entry_refused(self):
+        (self.fx.root / ".gitmodules").unlink()
+        failures = check_submodule(self.fx.root, self.fx.pin())
+        self.assertIn("harness.integrity.gitmodulesUrlMismatch", self.symbols(failures))
+
+    def test_origin_url_mismatch_refused(self):
+        # Only the submodule's configured origin is wrong; .gitmodules
+        # still matches.
+        git(
+            self.fx.subdir,
+            "remote",
+            "set-url",
+            "origin",
+            "https://example.invalid/other.git",
+        )
+        failures = check_submodule(self.fx.root, self.fx.pin())
+        symbols = self.symbols(failures)
+        self.assertIn("harness.integrity.originUrlMismatch", symbols)
+        self.assertNotIn("harness.integrity.gitmodulesUrlMismatch", symbols)
+
+    def test_missing_origin_remote_refused(self):
+        git(self.fx.subdir, "remote", "remove", "origin")
+        failures = check_submodule(self.fx.root, self.fx.pin())
+        self.assertIn("harness.integrity.originUrlMismatch", self.symbols(failures))
 
     def test_missing_tag_refused(self):
         pin = self.fx.pin(tags={"no-such-tag": self.fx.pinned_commit})

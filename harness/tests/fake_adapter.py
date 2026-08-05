@@ -40,6 +40,11 @@ def ok_response(case_id: str) -> str:
 def main() -> int:
     mode = sys.argv[1]
     out = sys.stdout
+    if mode == "never-reads":
+        # Never drains stdin: a large request must hit the pipe capacity
+        # and surface as a harness timeout on the send side.
+        time.sleep(600)
+        return 0
     line = sys.stdin.readline()
     request = json.loads(line) if line.strip().startswith("{") else {}
     case_id = request.get("caseId", "handshake")
@@ -100,6 +105,21 @@ def main() -> int:
         out.write(ok_response(case_id) + "\n" + '{"stray":"line"}' + "\n")
         out.flush()
         sys.stdin.read()
+        return 0
+    if mode == "trailing-blank-line":
+        out.write(ok_response(case_id) + "\n\n")
+        out.flush()
+        sys.stdin.read()
+        return 0
+    if mode == "trailing-spaces":
+        out.write(ok_response(case_id) + "\n   ")
+        out.flush()
+        sys.stdin.read()
+        return 0
+    if mode == "output-at-shutdown":
+        print(ok_response(case_id), flush=True)
+        sys.stdin.read()  # wait for EOF, then pollute stdout
+        print("late shutdown diagnostic on stdout", flush=True)
         return 0
     if mode == "wrong-case-id":
         print(ok_response("someone-else"), flush=True)

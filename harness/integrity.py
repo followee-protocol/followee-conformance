@@ -68,6 +68,53 @@ def check_submodule(repo_root: Path, pin: SubmodulePin) -> list[IntegrityFailure
         )
         return failures
 
+    # .gitmodules must record the pinned repository URL for this path.
+    code, out, err = _git(
+        repo_root,
+        "config",
+        "--file",
+        ".gitmodules",
+        "--get-regexp",
+        r"^submodule\..*\.path$",
+    )
+    name = None
+    if code == 0:
+        for entry in out.splitlines():
+            key, _, value = entry.partition(" ")
+            if value == pin.path:
+                name = key[len("submodule.") : -len(".path")]
+                break
+    if name is None:
+        fail(
+            "gitmodulesUrlMismatch",
+            f"no .gitmodules entry records path {pin.path}: {err}",
+        )
+    else:
+        code, url, err = _git(
+            repo_root, "config", "--file", ".gitmodules", f"submodule.{name}.url"
+        )
+        if code != 0:
+            fail(
+                "gitmodulesUrlMismatch",
+                f".gitmodules records no url for {name}: {err}",
+            )
+        elif url != pin.repository:
+            fail(
+                "gitmodulesUrlMismatch",
+                f".gitmodules records {url}, pinned {pin.repository}",
+            )
+
+    # The initialized submodule's configured origin must point at the
+    # pinned repository.
+    code, origin, err = _git(subdir, "remote", "get-url", "origin")
+    if code != 0:
+        fail("originUrlMismatch", f"cannot resolve origin remote: {err}")
+    elif origin != pin.repository:
+        fail(
+            "originUrlMismatch",
+            f"origin is {origin}, pinned {pin.repository}",
+        )
+
     # Superproject gitlink (index) must record the pinned commit.
     code, out, err = _git(repo_root, "ls-files", "-s", "--", pin.path)
     if code != 0 or not out:
