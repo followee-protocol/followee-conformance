@@ -96,6 +96,26 @@ class OperationTests(unittest.TestCase):
     def test_author_record_reproduces_appendix_b5_exactly(self):
         self.assert_expected_result("author-b5-root-revoked")
 
+    def test_author_signature_from_primitive_matches_the_sealed_envelope(self):
+        # signatureHex is produced by the model's public Ed25519 signing
+        # primitive over the Sig_structure, not by slicing the envelope;
+        # deterministic Ed25519 makes both byte-identical, and the
+        # published B.4/B.5 vectors pin the exact value independently.
+        for case_id in ("author-b4-root", "author-b5-root-revoked"):
+            case, response = self.run_case(case_id)
+            self.assertEqual(response["status"], "accepted", case_id)
+            result = response["result"]
+            self.assertEqual(len(result["signatureHex"]), 128, case_id)
+            self.assertTrue(
+                result["envelopeHex"].endswith(result["signatureHex"]),
+                f"{case_id}: primitive signature equals the envelope's",
+            )
+            self.assertEqual(
+                result["signatureHex"],
+                case["expectedResult"]["signatureHex"],
+                f"{case_id}: published signature",
+            )
+
     def test_author_record_reproduces_appendix_b6_digests(self):
         self.assert_expected_result("author-b6-alice-a")
         self.assert_expected_result("author-b6-alice-b")

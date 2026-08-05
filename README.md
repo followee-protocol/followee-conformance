@@ -31,7 +31,10 @@ commit to them from this repository.
 
 ## Setup
 
-Requires: git, Python ≥ 3.10, Rust ≥ 1.85 (stable), a POSIX shell.
+Requires: git, Python ≥ 3.10, a POSIX shell, and the pinned Rust
+toolchain `1.97.1` (the repository-root `rust-toolchain.toml` matches the
+frozen implementation's own pin; with rustup installed, the right
+toolchain is selected and fetched automatically).
 
 ```sh
 git clone https://github.com/followee-protocol/followee-conformance.git
@@ -87,10 +90,14 @@ single-case reproduction command (HARNESS.md Section 16).
 ## Layout
 
 See HARNESS.md Section 5. In brief: `harness/` owns orchestration,
-integrity, and comparison; `adapters/` contains one thin translation
-process per implementation (no protocol logic, no copied model code);
-`schemas/` holds the normative runner and case JSON Schemas; `cases/` and
-`reports/` are empty at Milestone 0.
+integrity, comparison, and the chained scenarios; `adapters/` contains
+one thin translation process per implementation (no protocol logic, no
+copied model code); `schemas/` holds the normative runner and case JSON
+Schemas; `cases/specification/` holds the 65 specification-status cases
+with their `DIGESTS.sha256` content manifest, regenerable byte-for-byte
+by `scripts/build_specification_corpus.py`; committed milestone reports
+live under `reports/` while scratch output stays in `reports/scratch/`
+(ignored).
 
 ## License
 

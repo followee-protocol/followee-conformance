@@ -100,16 +100,36 @@ def verify_digest_manifest(cases_dir: Path) -> dict[str, str]:
     for line_number, line in enumerate(
         manifest_path.read_text(encoding="utf-8").splitlines(), start=1
     ):
-        if not line.strip():
+        if not line:
             continue
-        try:
-            digest, name = line.split("  ", 1)
-        except ValueError as exc:
+
+        # Exactly: 64 lowercase-hex digest, the two-space separator, and a
+        # plain filename — no path components, no surrounding whitespace,
+        # no extra separators anywhere on the line.
+        problem: str | None = None
+        digest = name = ""
+        parts = line.split("  ")
+        if len(parts) != 2:
+            problem = "expected exactly one two-space separator"
+        else:
+            digest, name = parts
+            if len(digest) != 64 or any(c not in "0123456789abcdef" for c in digest):
+                problem = "digest must be 64 lowercase hexadecimal chars"
+            elif not name or name != name.strip():
+                problem = "filename must have no surrounding whitespace"
+            elif "/" in name or "\\" in name or name in (".", ".."):
+                problem = "filename must not contain path components"
+        if problem is not None:
             raise CaseError(
                 "harness.case.digestManifestMalformed",
-                f"{manifest_path}:{line_number}: {line!r}",
-            ) from exc
-        listed[name.strip()] = digest.strip()
+                f"{manifest_path.name}:{line_number}: {problem}: {line!r}",
+            )
+        if name in listed:
+            raise CaseError(
+                "harness.case.digestManifestDuplicate",
+                f"{manifest_path.name}:{line_number}: duplicate entry for {name!r}",
+            )
+        listed[name] = digest
 
     actual_files = sorted(
         p.name for p in cases_dir.glob("*.json") if p.name != DIGEST_MANIFEST

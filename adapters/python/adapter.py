@@ -584,12 +584,19 @@ def op_author_record(model: SimpleNamespace, input_value: Any) -> dict[str, Any]
         raise OpRejected(_followee_symbol(model, exc)) from exc
 
     sig_structure = model.cose.sig_structure(body_bytes)
+    # The reported signature comes from the model's public Ed25519 signing
+    # primitive over the model-produced Sig_structure — never from slicing
+    # the envelope, which would bake a COSE-layout assumption into the
+    # adapter.  Ed25519 signing is deterministic, so this is byte-identical
+    # to the signature that sign_record_body sealed into the envelope; the
+    # comparator's exact envelope comparison would expose any divergence.
+    signature = model.ed25519.sign(signing_seed, sig_structure)
     return {
         "did": did,
         "recordBodyCborHex": body_bytes.hex(),
         "recordBodyDigestHex": verified.body_digest.hex(),
         "sigStructureHex": sig_structure.hex(),
-        "signatureHex": envelope[-64:].hex(),
+        "signatureHex": signature.hex(),
         "envelopeHex": envelope.hex(),
     }
 

@@ -4,9 +4,10 @@ on:
   push:
   pull_request:
 
-# Milestone 0 CI (HARNESS.md Section 19): integrity checks, schema
+# Milestone 1 CI (HARNESS.md Section 19): integrity checks, schema
 # validation, harness and adapter unit tests, lint/format, the hello
-# handshake, and the negative pin-refusal test.  No job depends on the
+# handshake, the negative pin-refusal test, the corpus drift check, and
+# the specification-status differential campaign.  No job depends on the
 # public Internet after checkout and dependency installation.
 
 jobs:

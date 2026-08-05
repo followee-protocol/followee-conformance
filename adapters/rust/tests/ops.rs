@@ -69,6 +69,32 @@ fn author_record_reproduces_appendix_b5_exactly() {
 }
 
 #[test]
+fn author_signature_from_primitive_matches_the_sealed_envelope() {
+    // signatureHex is produced by the implementation's public Ed25519
+    // signing primitive over the Sig_structure, not by slicing the
+    // envelope; deterministic Ed25519 makes both byte-identical, and the
+    // published B.4/B.5 vectors pin the exact value independently.
+    for case_id in ["author-b4-root", "author-b5-root-revoked"] {
+        let case = load_case(case_id);
+        let response = respond_to(&case);
+        assert_eq!(response["status"], "accepted", "{case_id}");
+        let result = &response["result"];
+        let signature = result["signatureHex"].as_str().unwrap();
+        let envelope = result["envelopeHex"].as_str().unwrap();
+        assert_eq!(signature.len(), 128, "{case_id}: 64-byte signature");
+        assert!(
+            envelope.ends_with(signature),
+            "{case_id}: primitive signature equals the envelope's"
+        );
+        assert_eq!(
+            signature,
+            case["expectedResult"]["signatureHex"].as_str().unwrap(),
+            "{case_id}: published signature"
+        );
+    }
+}
+
+#[test]
 fn author_record_reproduces_appendix_b6_digests() {
     assert_expected_result("author-b6-alice-a");
     assert_expected_result("author-b6-alice-b");

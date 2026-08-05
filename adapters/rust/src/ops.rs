@@ -614,7 +614,14 @@ pub fn author_record(input: StrictValue) -> Result<Value, OpError> {
         .map_err(|e| OpError::Rejected { error: e.symbol() })?;
 
     let sig_structure = followee::sig_structure(&body_bytes);
-    let signature = &envelope[envelope.len() - 64..];
+    // The reported signature comes from the implementation's public
+    // Ed25519 signing primitive over the implementation-produced
+    // Sig_structure — never from slicing the envelope, which would bake a
+    // COSE-layout assumption into the adapter.  Ed25519 signing is
+    // deterministic, so this is byte-identical to the signature that
+    // `sign_record` sealed into the envelope; the comparator's exact
+    // envelope comparison would expose any divergence.
+    let signature = crypto::ed25519_sign(&signing_seed, &sig_structure);
     let body_digest = crypto::sha256(&body_bytes);
 
     Ok(json!({
@@ -622,7 +629,7 @@ pub fn author_record(input: StrictValue) -> Result<Value, OpError> {
         "recordBodyCborHex": encode_hex(&body_bytes),
         "recordBodyDigestHex": encode_hex(&body_digest),
         "sigStructureHex": encode_hex(&sig_structure),
-        "signatureHex": encode_hex(signature),
+        "signatureHex": encode_hex(&signature),
         "envelopeHex": encode_hex(&envelope),
     }))
 }
