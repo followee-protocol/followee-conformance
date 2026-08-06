@@ -1,0 +1,23 @@
+{
+  "id": "validate-cbor-accept-descriptor",
+  "runnerProtocol": "1",
+  "operation": "validateCbor",
+  "specificationCommit": "abc9a55d90f1026e6509207abda73e5dc6d14241",
+  "specificationSections": [
+    "Section 6.1",
+    "Appendix B.3"
+  ],
+  "derivationStatus": "specification",
+  "faultProfile": "none",
+  "expected": {
+    "outcome": "accepted"
+  },
+  "input": {
+    "cborHex": "a3000101a2003201582003a107bff3ce10be1d70dd18e74bc09967e4d6309ba50d5f1ddc8664125531b8025820d123bafb7ae35472d9a73944d98314a38ff8f201d79c32e640f97a27bec880de",
+    "maxDepth": "8",
+    "maxMembers": "256"
+  },
+  "expectedResult": {
+    "valid": true
+  }
+}

@@ -7,8 +7,8 @@ set -eu
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SUB="$REPO_ROOT/implementations/followee-rs"
-PINNED="774acb7578795cf6d58f77b76b16ef010114ebd6"
-WRONG="d23d660c1efb8e1c8f0095a2b44040bc44cf5160"
+PINNED="c30b2207aeccb4daa5fb06a388ecd0ec5e0ab625"
+WRONG="774acb7578795cf6d58f77b76b16ef010114ebd6"
 
 if [ -n "$(git -C "$SUB" status --porcelain)" ]; then
     echo "refusing: $SUB is dirty; the negative pin test needs a clean tree" >&2

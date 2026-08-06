@@ -36,7 +36,7 @@ All work begins from these exact public revisions:
 | Artifact | Repository | Immutable revision |
 | --- | --- | --- |
 | Followee Specification v0.7 | `followee-protocol/followee` | commit `abc9a55d90f1026e6509207abda73e5dc6d14241` |
-| Rust protocol core | `followee-protocol/followee-rs` | tag `milestone-1-v0.7-reviewed`, commit `774acb7578795cf6d58f77b76b16ef010114ebd6` |
+| Rust protocol core | `followee-protocol/followee-rs` | tag `milestone-1-v0.7-conformance-api-reviewed`, commit `c30b2207aeccb4daa5fb06a388ecd0ec5e0ab625` |
 | Python clean-room model | `followee-protocol/followee-python-cleanroom` | tag `cleanroom-v0.7-maintenance-freeze`, commit `a39138dae8072c7b89dc922bcfe6f5717312c6e6` |
 
 The SHA-256 digest of the pinned `Followee-Specification.md` is:
@@ -47,6 +47,10 @@ The SHA-256 digest of the pinned `Followee-Specification.md` is:
 
 For audit continuity, the harness report MUST also record:
 
+- the conformance-API commit's parent — the reviewed Milestone 1 revision
+  `774acb7578795cf6d58f77b76b16ef010114ebd6` (tag
+  `milestone-1-v0.7-reviewed`), which remains the producing revision for
+  the provisional fixtures imported from its manifests;
 - the Rust review-fix commit's parent,
   `d23d660c1efb8e1c8f0095a2b44040bc44cf5160`;
 - the Python v0.7 maintenance input commit,
@@ -271,7 +275,7 @@ The response result contains at least:
   "adapter": "followee-rust",
   "adapterVersion": "1",
   "implementationRepository": "https://github.com/followee-protocol/followee-rs",
-  "implementationCommit": "774acb7578795cf6d58f77b76b16ef010114ebd6",
+  "implementationCommit": "c30b2207aeccb4daa5fb06a388ecd0ec5e0ab625",
   "specificationCommit": "abc9a55d90f1026e6509207abda73e5dc6d14241",
   "runnerProtocols": ["1"],
   "operations": ["deriveIdentity", "authorRecord", "verifyRecord"]

@@ -1,0 +1,36 @@
+{
+  "id": "impl-b7-17a-descriptor-label0-false",
+  "runnerProtocol": "1",
+  "operation": "verifyRecord",
+  "specificationCommit": "abc9a55d90f1026e6509207abda73e5dc6d14241",
+  "specificationSections": [
+    "Appendix B.7 item 17"
+  ],
+  "derivationStatus": "implementation",
+  "faultProfile": "single",
+  "expected": {
+    "outcome": "rejected",
+    "errorAssertion": "exact",
+    "error": "schemaViolation"
+  },
+  "input": {
+    "targetDid": "did:flw:zQma9uDjA16roUPe6asGy8gYmabWEAnNm389Av2FApy2PMH",
+    "envelopeHex": "d28443a10132a0590118a600010178376469643a666c773a7a516d613975446a413136726f55506536617347793867596d61625745416e4e6d3338394176324641707932504d48021b0000019fbd68f4fb030004a301a2003201582003a107bff3ce10be1d70dd18e74bc09967e4d6309ba50d5f1ddc8664125531b8025820d123bafb7ae35472d9a73944d98314a38ff8f201d79c32e640f97a27bec880def40107a4006d416c696365204578616d706c650166577269746572038176616363743a616c696365406578616d706c652e636f6d0481a500646665656401644665656402781e68747470733a2f2f616c6963652e6578616d706c652f666565642e786d6c03746170706c69636174696f6e2f61746f6d2b786d6c046757726974696e675840e5ff8a44a351a7e919f32e4d6c8c72bbd7f1fbceb0d2e2beb180e0af7cea9b72f9ebf3fa77c6052b2f2e4e103d0c2cb78688a1f58433bb167597295ce2f0e608",
+    "nowMs": "1785589200123"
+  },
+  "derivedFrom": {
+    "baseVector": "B.4",
+    "mutation": "descriptor label 0 replaced by CBOR false; body id and target derived from the mutated descriptor; deterministic key order preserved",
+    "protectedBytesChanged": false,
+    "payloadBytesChanged": true,
+    "resigned": true,
+    "resignedKey": "B.2 root seed"
+  },
+  "producedBy": "followee-rs",
+  "provenance": {
+    "sourceManifest": "implementations/followee-rs/fixtures/implementation/PROVENANCE.json",
+    "sourceCaseId": "b7-17a-descriptor-label0-false",
+    "sourceNote": "internally consistent, descriptor-bound, correctly signed per v0.7 item 17",
+    "constructedBy": "tools/fixture-builder (frozen followee-rs public API and its pinned test suite's raw constructions)"
+  }
+}

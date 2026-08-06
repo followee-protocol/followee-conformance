@@ -17,7 +17,16 @@
       "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
     },
     "operation": {
-      "enum": ["hello", "deriveIdentity", "authorRecord", "verifyRecord"]
+      "enum": [
+        "hello",
+        "deriveIdentity",
+        "authorRecord",
+        "verifyRecord",
+        "strictEd25519",
+        "nextTimestamp",
+        "validateCbor",
+        "selectCurrent"
+      ]
     },
     "input": {
       "$comment": "Operation-specific; validated against operations.schema.json.",

@@ -1,0 +1,34 @@
+{
+  "id": "impl-b7-4a-missing-tag",
+  "runnerProtocol": "1",
+  "operation": "verifyRecord",
+  "specificationCommit": "abc9a55d90f1026e6509207abda73e5dc6d14241",
+  "specificationSections": [
+    "Appendix B.7 item 4"
+  ],
+  "derivationStatus": "implementation",
+  "faultProfile": "single",
+  "expected": {
+    "outcome": "rejected",
+    "errorAssertion": "unspecified"
+  },
+  "input": {
+    "targetDid": "did:flw:zQmPcGstBa7wW9hoYQbS6JZ4UxwZmoKr7YVf9y7qxiyD3Cm",
+    "envelopeHex": "8443a10132a0590118a600010178376469643a666c773a7a516d5063477374426137775739686f59516253364a5a345578775a6d6f4b7237595666397937717869794433436d021b0000019fbd68f4fb030004a3000101a2003201582003a107bff3ce10be1d70dd18e74bc09967e4d6309ba50d5f1ddc8664125531b8025820d123bafb7ae35472d9a73944d98314a38ff8f201d79c32e640f97a27bec880de07a4006d416c696365204578616d706c650166577269746572038176616363743a616c696365406578616d706c652e636f6d0481a500646665656401644665656402781e68747470733a2f2f616c6963652e6578616d706c652f666565642e786d6c03746170706c69636174696f6e2f61746f6d2b786d6c046757726974696e6758404db146d7bc6ca7690bac44b0c6ef38bcdd685ff157fdcca15da6b64662a26f94bd95b88f97f3e720246b3756c6eb6b8967103f9346dbef51c053cac381a50204",
+    "nowMs": "1785589200123"
+  },
+  "derivedFrom": {
+    "baseVector": "B.4",
+    "mutation": "leading d2 tag byte removed; signed material untouched",
+    "protectedBytesChanged": false,
+    "payloadBytesChanged": false,
+    "resigned": false
+  },
+  "producedBy": "followee-rs",
+  "provenance": {
+    "sourceManifest": "implementations/followee-rs/fixtures/implementation/PROVENANCE.json",
+    "sourceCaseId": "b7-4a-missing-tag",
+    "sourceNote": null,
+    "constructedBy": "documented byte splice of published Appendix B values per the pinned manifest description"
+  }
+}

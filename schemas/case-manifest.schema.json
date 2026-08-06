@@ -193,6 +193,10 @@
     "producedBy": {
       "enum": ["followee-rs", "followee-python-cleanroom"]
     },
+    "provenance": {
+      "$comment": "Free-form provenance record for imported fixtures: the source manifest, upstream origin, retrieval digests, and construction notes. Imported implementation-status cases preserve the pinned source manifest's exact description here; promotion to confirmed never rewrites it (HARNESS.md Section 12).",
+      "type": "object"
+    },
     "confirmations": {
       "type": "array",
       "items": {

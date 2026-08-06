@@ -228,7 +228,16 @@ fn hello_result(identity: &Identity) -> Value {
     result.insert("runnerProtocols".into(), json!([RUNNER_PROTOCOL]));
     result.insert(
         "operations".into(),
-        json!(["hello", "deriveIdentity", "authorRecord", "verifyRecord"]),
+        json!([
+            "hello",
+            "deriveIdentity",
+            "authorRecord",
+            "verifyRecord",
+            "strictEd25519",
+            "nextTimestamp",
+            "validateCbor",
+            "selectCurrent"
+        ]),
     );
     Value::Object(result)
 }
@@ -353,11 +362,21 @@ pub fn handle_line(identity: &Identity, raw: &[u8], truncated: bool) -> String {
         "verifyRecord" => {
             operation_response(&request.case_id, ops::verify_record_op(request.input))
         }
+        "strictEd25519" => operation_response(&request.case_id, ops::strict_ed25519(request.input)),
+        "nextTimestamp" => {
+            operation_response(&request.case_id, ops::next_timestamp_op(request.input))
+        }
+        "validateCbor" => {
+            operation_response(&request.case_id, ops::validate_cbor_op(request.input))
+        }
+        "selectCurrent" => {
+            operation_response(&request.case_id, ops::select_current_op(request.input))
+        }
         other => adapter_error(
             RUNNER_PROTOCOL,
             request.case_id.as_str(),
             "adapter.unsupportedOperation",
-            &format!("operation {other:?} is not supported at Milestone 1"),
+            &format!("operation {other:?} is not supported at Milestone 2"),
         ),
     }
 }
@@ -371,7 +390,7 @@ mod tests {
             adapter: "followee-rust",
             adapter_version: "1",
             implementation_repository: "https://github.com/followee-protocol/followee-rs",
-            implementation_commit: "774acb7578795cf6d58f77b76b16ef010114ebd6",
+            implementation_commit: "c30b2207aeccb4daa5fb06a388ecd0ec5e0ab625",
             specification_commit: "abc9a55d90f1026e6509207abda73e5dc6d14241",
         }
     }
@@ -393,7 +412,7 @@ mod tests {
         assert_eq!(result["adapter"], "followee-rust");
         assert_eq!(
             result["implementationCommit"],
-            "774acb7578795cf6d58f77b76b16ef010114ebd6"
+            "c30b2207aeccb4daa5fb06a388ecd0ec5e0ab625"
         );
         assert_eq!(
             result["specificationCommit"],
@@ -402,7 +421,16 @@ mod tests {
         assert_eq!(result["runnerProtocols"], json!(["1"]));
         assert_eq!(
             result["operations"],
-            json!(["hello", "deriveIdentity", "authorRecord", "verifyRecord"])
+            json!([
+                "hello",
+                "deriveIdentity",
+                "authorRecord",
+                "verifyRecord",
+                "strictEd25519",
+                "nextTimestamp",
+                "validateCbor",
+                "selectCurrent"
+            ])
         );
     }
 
@@ -484,9 +512,8 @@ mod tests {
 
     #[test]
     fn unsupported_operation_is_refused_not_rejected() {
-        let r = respond(
-            r#"{"runnerProtocol":"1","caseId":"x","operation":"selectCurrent","input":{}}"#,
-        );
+        let r =
+            respond(r#"{"runnerProtocol":"1","caseId":"x","operation":"resolveRelay","input":{}}"#);
         assert_eq!(r["status"], "adapterError");
         assert_eq!(r["error"], "adapter.unsupportedOperation");
     }

@@ -1,0 +1,36 @@
+{
+  "id": "impl-b7-17d-public-key-label1-true",
+  "runnerProtocol": "1",
+  "operation": "verifyRecord",
+  "specificationCommit": "abc9a55d90f1026e6509207abda73e5dc6d14241",
+  "specificationSections": [
+    "Appendix B.7 item 17"
+  ],
+  "derivationStatus": "implementation",
+  "faultProfile": "single",
+  "expected": {
+    "outcome": "rejected",
+    "errorAssertion": "exact",
+    "error": "schemaViolation"
+  },
+  "input": {
+    "targetDid": "did:flw:zQmTSxWn9yLBLBJLMXnLqjSCU8pxSuW6aFYxBpgZVkbNWTM",
+    "envelopeHex": "d28443a10132a0590118a600010178376469643a666c773a7a516d545378576e39794c424c424a4c4d586e4c716a53435538707853755736614659784270675a566b624e57544d021b0000019fbd68f4fb030004a3000101a20032f5582003a107bff3ce10be1d70dd18e74bc09967e4d6309ba50d5f1ddc8664125531b8025820d123bafb7ae35472d9a73944d98314a38ff8f201d79c32e640f97a27bec880de07a4006d416c696365204578616d706c650166577269746572038176616363743a616c696365406578616d706c652e636f6d0481a500646665656401644665656402781e68747470733a2f2f616c6963652e6578616d706c652f666565642e786d6c03746170706c69636174696f6e2f61746f6d2b786d6c046757726974696e675840a1c827df5015118fc2220dff7a2cf33819c536787333a425313a47a257f5608bbf579c2c1f17bd85b5be2c6d125015988e34587a447bfd6b5f5d57c8227b1605",
+    "nowMs": "1785589200123"
+  },
+  "derivedFrom": {
+    "baseVector": "B.4",
+    "mutation": "nested public-key label 1 replaced by CBOR true; same complete construction",
+    "protectedBytesChanged": false,
+    "payloadBytesChanged": true,
+    "resigned": true,
+    "resignedKey": "B.2 root seed"
+  },
+  "producedBy": "followee-rs",
+  "provenance": {
+    "sourceManifest": "implementations/followee-rs/fixtures/implementation/PROVENANCE.json",
+    "sourceCaseId": "b7-17d-public-key-label1-true",
+    "sourceNote": null,
+    "constructedBy": "tools/fixture-builder (frozen followee-rs public API and its pinned test suite's raw constructions)"
+  }
+}

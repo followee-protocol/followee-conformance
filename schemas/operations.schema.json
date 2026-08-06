@@ -371,6 +371,117 @@
         "nowMs": { "$ref": "#/$defs/uint64" }
       }
     },
+    "strictEd25519Input": {
+      "$comment": "HARNESS.md 9.5. Lengths are deliberately unconstrained: malformed key and signature lengths are legitimate negative inputs; the strict verifiers classify them (specification 3.3 rules 1-2; enforced by type in followee-rs per its documented public contract).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["publicKeyHex", "messageHex", "signatureHex"],
+      "properties": {
+        "publicKeyHex": { "$ref": "#/$defs/hexBytes" },
+        "messageHex": { "$ref": "#/$defs/hexBytes" },
+        "signatureHex": { "$ref": "#/$defs/hexBytes" }
+      }
+    },
+    "strictEd25519Result": {
+      "$comment": "valid:false is a successful execution of the primitive, not a rejected runner request (HARNESS.md 9.5).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["valid"],
+      "properties": {
+        "valid": { "type": "boolean" },
+        "diagnostic": { "type": "object" }
+      }
+    },
+    "nextTimestampInput": {
+      "$comment": "HARNESS.md 9.6. System time is forbidden; both values are explicit.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["nowMs", "previousTimestampMs"],
+      "properties": {
+        "nowMs": { "$ref": "#/$defs/uint64" },
+        "previousTimestampMs": { "$ref": "#/$defs/uint64OrNull" }
+      }
+    },
+    "nextTimestampResult": {
+      "$comment": "The exact next timestamp, or the implementations' overflow classification (Rust TimestampError::Overflow / Python OverflowError) mapped to the portable symbol 'overflow'.",
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["timestampMs", "error"],
+          "properties": {
+            "timestampMs": { "$ref": "#/$defs/uint64" },
+            "error": { "type": "null" },
+            "diagnostic": { "type": "object" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["timestampMs", "error"],
+          "properties": {
+            "timestampMs": { "type": "null" },
+            "error": { "const": "overflow" },
+            "diagnostic": { "type": "object" }
+          }
+        }
+      ]
+    },
+    "validateCborInput": {
+      "$comment": "HARNESS.md 9.7. The runner contract bounds maxDepth to 0..=8 and maxMembers to 0..=256 (the specification Section 15.1 record-body maxima), encoded as canonical decimal strings; adapters additionally enforce the domain before calling an implementation, and out-of-domain values are adapter/input errors, never Followee conformance results.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cborHex", "maxDepth", "maxMembers"],
+      "properties": {
+        "cborHex": { "$ref": "#/$defs/hexBytes" },
+        "maxDepth": {
+          "type": "string",
+          "pattern": "^[0-8]$"
+        },
+        "maxMembers": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]?|1[0-9][0-9]|2[0-4][0-9]|25[0-6])$"
+        }
+      }
+    },
+    "validateCborResult": {
+      "$comment": "Acceptance of exactly one deterministic-profile CBOR item within the requested limits. Failures are runner-level rejections carrying the implementation classification invalidCbor, nonDeterministicCbor, or schemaViolation (HARNESS.md 9.7); exact symbolic equality is required only where the case manifest demands it.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["valid"],
+      "properties": {
+        "valid": { "const": true },
+        "diagnostic": { "type": "object" }
+      }
+    },
+    "selectCurrentInput": {
+      "$comment": "HARNESS.md 9.4. The subject is always the explicit targetDid; it is never inferred from a candidate.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["targetDid", "candidateEnvelopeHex", "nowMs", "stickyAuthority"],
+      "properties": {
+        "targetDid": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "candidateEnvelopeHex": {
+          "type": "array",
+          "maxItems": 256,
+          "items": { "$ref": "#/$defs/hexBytes" }
+        },
+        "nowMs": { "$ref": "#/$defs/uint64" },
+        "stickyAuthority": { "enum": ["unknown", "root", "rootRevoked"] }
+      }
+    },
+    "selectCurrentResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["winnerRecordBodyDigestHex", "authorityState"],
+      "properties": {
+        "winnerRecordBodyDigestHex": {
+          "oneOf": [{ "$ref": "#/$defs/hex32Bytes" }, { "type": "null" }]
+        },
+        "authorityState": { "enum": ["unknown", "root", "rootRevoked"] },
+        "diagnostic": { "type": "object" }
+      }
+    },
     "verifyRecordResult": {
       "type": "object",
       "additionalProperties": false,

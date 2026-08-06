@@ -16,12 +16,13 @@ from pathlib import Path
 ADAPTER_DIR = Path(__file__).resolve().parents[1]
 REPO_ROOT = ADAPTER_DIR.parents[1]
 CASES_DIR = REPO_ROOT / "cases" / "specification"
+IMPL_CASES_DIR = REPO_ROOT / "cases" / "implementation"
 ADAPTER = ADAPTER_DIR / "adapter.py"
 
 sys.path.insert(0, str(ADAPTER_DIR))
 import adapter
 
-RUST_COMMIT = "774acb7578795cf6d58f77b76b16ef010114ebd6"
+RUST_COMMIT = "c30b2207aeccb4daa5fb06a388ecd0ec5e0ab625"
 PYTHON_COMMIT = "a39138dae8072c7b89dc922bcfe6f5717312c6e6"
 SPEC_COMMIT = "abc9a55d90f1026e6509207abda73e5dc6d14241"
 
@@ -34,7 +35,16 @@ IDENTITY = {
     "implementationCommit": PYTHON_COMMIT,
     "specificationCommit": SPEC_COMMIT,
     "runnerProtocols": ["1"],
-    "operations": ["hello", "deriveIdentity", "authorRecord", "verifyRecord"],
+    "operations": [
+        "hello",
+        "deriveIdentity",
+        "authorRecord",
+        "verifyRecord",
+        "strictEd25519",
+        "nextTimestamp",
+        "validateCbor",
+        "selectCurrent",
+    ],
 }
 
 MODEL = adapter.load_model()
@@ -198,6 +208,166 @@ class OperationTests(unittest.TestCase):
         self.assertEqual(response["status"], "adapterError")
         self.assertEqual(response["error"], "adapter.unrepresentableInput")
 
+    def test_strict_ed25519_specification_cases(self):
+        checked = 0
+        for path in sorted(CASES_DIR.glob("strict-*.json")):
+            case = json.loads(path.read_text())
+            response = adapter.handle_line(IDENTITY, MODEL, request_line(case), False)
+            self.assertEqual(response["status"], "accepted", case["id"])
+            self.assertEqual(
+                response["result"]["valid"],
+                case["expectedResult"]["valid"],
+                case["id"],
+            )
+            checked += 1
+        self.assertGreaterEqual(checked, 11)
+
+    def test_next_timestamp_specification_cases(self):
+        checked = 0
+        for path in sorted(CASES_DIR.glob("next-*.json")):
+            case = json.loads(path.read_text())
+            response = adapter.handle_line(IDENTITY, MODEL, request_line(case), False)
+            self.assertEqual(response["status"], "accepted", case["id"])
+            for member, value in case["expectedResult"].items():
+                self.assertEqual(
+                    response["result"][member], value, f"{case['id']}:{member}"
+                )
+            checked += 1
+        self.assertGreaterEqual(checked, 9)
+
+    def test_select_current_specification_cases(self):
+        checked = 0
+        for path in sorted(CASES_DIR.glob("select-*.json")):
+            case = json.loads(path.read_text())
+            response = adapter.handle_line(IDENTITY, MODEL, request_line(case), False)
+            if case["expected"]["outcome"] == "rejected":
+                self.assertEqual(response["status"], "rejected", case["id"])
+                if case["expected"]["errorAssertion"] == "exact":
+                    self.assertEqual(
+                        response["error"], case["expected"]["error"], case["id"]
+                    )
+            else:
+                self.assertEqual(response["status"], "accepted", case["id"])
+                for member, value in case["expectedResult"].items():
+                    self.assertEqual(
+                        response["result"][member],
+                        value,
+                        f"{case['id']}:{member}",
+                    )
+            checked += 1
+        self.assertGreaterEqual(checked, 13)
+
+    def test_implementation_corpus_cases(self):
+        # Provisional followee-rs fixture inputs, discovered independently
+        # by this adapter: expectations come from the pinned provenance
+        # manifest, never from Rust outputs.
+        checked = 0
+        for path in sorted(IMPL_CASES_DIR.glob("impl-*.json")):
+            case = json.loads(path.read_text())
+            response = adapter.handle_line(IDENTITY, MODEL, request_line(case), False)
+            if case["expected"]["outcome"] == "rejected":
+                self.assertEqual(response["status"], "rejected", case["id"])
+                if case["expected"].get("errorAssertion") == "exact":
+                    self.assertEqual(
+                        response["error"], case["expected"]["error"], case["id"]
+                    )
+            else:
+                self.assertEqual(response["status"], "accepted", case["id"])
+                for member, value in case.get("expectedResult", {}).items():
+                    self.assertEqual(
+                        response["result"][member],
+                        value,
+                        f"{case['id']}:{member}",
+                    )
+            checked += 1
+        self.assertGreaterEqual(checked, 49)
+
+    def test_select_result_fields_are_complete(self):
+        case = load_case("select-root-only")
+        response = adapter.handle_line(IDENTITY, MODEL, request_line(case), False)
+        result = {k: v for k, v in response["result"].items() if k != "diagnostic"}
+        self.assertEqual(set(result), {"winnerRecordBodyDigestHex", "authorityState"})
+
+    def test_validate_cbor_specification_cases(self):
+        checked = 0
+        for path in sorted(CASES_DIR.glob("validate-cbor-*.json")):
+            case = json.loads(path.read_text())
+            response = adapter.handle_line(IDENTITY, MODEL, request_line(case), False)
+            if case["expected"]["outcome"] == "rejected":
+                self.assertEqual(response["status"], "rejected", case["id"])
+                if case["expected"]["errorAssertion"] == "exact":
+                    self.assertEqual(
+                        response["error"], case["expected"]["error"], case["id"]
+                    )
+            else:
+                self.assertEqual(response["status"], "accepted", case["id"])
+                self.assertTrue(response["result"]["valid"], case["id"])
+            checked += 1
+        self.assertGreaterEqual(checked, 38)
+
+    def test_validate_cbor_limits_domain_is_runner_contract(self):
+        case = load_case("validate-cbor-accept-uint-zero")
+        for member, value in (("maxDepth", "9"), ("maxMembers", "257")):
+            bad = json.loads(json.dumps(case))
+            bad["input"][member] = value
+            response = adapter.handle_line(IDENTITY, MODEL, request_line(bad), False)
+            self.assertEqual(response["status"], "adapterError", member)
+            self.assertEqual(response["error"], "adapter.invalidInput")
+
+    def test_validate_cbor_parity_with_record_path(self):
+        # The primitive must exercise the same production validator as
+        # full-record verification: identical payload bytes must classify
+        # identically through both operations, and acceptance parity holds
+        # for the published Appendix B.4 body.  A substitute validator in
+        # either path would break this.
+        pairs = [
+            ("validate-cbor-accept-b4-record-body", "verify-b4-root", None),
+            (
+                "validate-cbor-reordered-b4-body",
+                "verify-b7-08-reordered-body-keys",
+                "nonDeterministicCbor",
+            ),
+        ]
+        for cbor_case_id, verify_case_id, symbol in pairs:
+            cbor_case = load_case(cbor_case_id)
+            verify_case = load_case(verify_case_id)
+            self.assertIn(
+                cbor_case["input"]["cborHex"],
+                verify_case["input"]["envelopeHex"],
+                f"{cbor_case_id}: payload bytes embedded in the envelope",
+            )
+            cbor_response = adapter.handle_line(
+                IDENTITY, MODEL, request_line(cbor_case), False
+            )
+            verify_response = adapter.handle_line(
+                IDENTITY, MODEL, request_line(verify_case), False
+            )
+            if symbol is None:
+                self.assertEqual(cbor_response["status"], "accepted")
+                self.assertEqual(verify_response["status"], "accepted")
+            else:
+                self.assertEqual(cbor_response["error"], symbol)
+                self.assertEqual(verify_response["error"], symbol)
+
+    def test_validate_cbor_parity_with_imported_duplicate_key_fixture(self):
+        cbor_case = load_case("validate-cbor-duplicate-label-b4-body")
+        impl_case = json.loads(
+            (IMPL_CASES_DIR / "impl-b7-9-duplicate-key.json").read_text()
+        )
+        self.assertIn(
+            cbor_case["input"]["cborHex"],
+            impl_case["input"]["envelopeHex"],
+            "duplicate-label body embedded in the imported envelope",
+        )
+        cbor_response = adapter.handle_line(
+            IDENTITY, MODEL, request_line(cbor_case), False
+        )
+        impl_response = adapter.handle_line(
+            IDENTITY, MODEL, request_line(impl_case), False
+        )
+        self.assertEqual(cbor_response["error"], "nonDeterministicCbor")
+        self.assertEqual(impl_response["error"], "nonDeterministicCbor")
+
     def test_input_contract_violations_are_adapter_errors(self):
         base = load_case("derive-identity-alice")["input"]
         violations = [
@@ -290,7 +460,7 @@ class HandleLineFramingTests(unittest.TestCase):
 
     def test_unsupported_operation_is_not_a_followee_rejection(self):
         response = self.assert_adapter_error(
-            b'{"runnerProtocol":"1","caseId":"x","operation":"selectCurrent",'
+            b'{"runnerProtocol":"1","caseId":"x","operation":"resolveRelay",'
             b'"input":{}}',
             "adapter.unsupportedOperation",
         )

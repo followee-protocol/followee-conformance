@@ -22,7 +22,12 @@ SPECIFICATION_SHA256 = (
     "2b264823ba68d9a7d69ce68de5c1408ac8a3d54ff6d726ab89ee2baa2707c81f"
 )
 
-RUST_COMMIT = "774acb7578795cf6d58f77b76b16ef010114ebd6"
+RUST_COMMIT = "c30b2207aeccb4daa5fb06a388ecd0ec5e0ab625"
+# Audit continuity: the new pin is the API-only descendant of the reviewed
+# Milestone 1 revision, which remains the producing revision for the
+# provisional fixtures imported under cases/implementation/.
+RUST_CONFORMANCE_API_PARENT = "774acb7578795cf6d58f77b76b16ef010114ebd6"
+RUST_FIXTURE_PRODUCING_COMMIT = RUST_CONFORMANCE_API_PARENT
 RUST_REVIEW_FIX_PARENT = "d23d660c1efb8e1c8f0095a2b44040bc44cf5160"
 
 PYTHON_COMMIT = "a39138dae8072c7b89dc922bcfe6f5717312c6e6"
@@ -57,8 +62,12 @@ RUST_PIN = SubmodulePin(
     path="implementations/followee-rs",
     repository="https://github.com/followee-protocol/followee-rs.git",
     commit=RUST_COMMIT,
-    tags={"milestone-1-v0.7-reviewed": RUST_COMMIT},
-    parent=RUST_REVIEW_FIX_PARENT,
+    tags={
+        "milestone-1-v0.7-conformance-api-reviewed": RUST_COMMIT,
+        "milestone-1-v0.7-reviewed": RUST_CONFORMANCE_API_PARENT,
+    },
+    parent=RUST_CONFORMANCE_API_PARENT,
+    audit_commits=(RUST_REVIEW_FIX_PARENT,),
 )
 
 PYTHON_PIN = SubmodulePin(
@@ -107,12 +116,25 @@ PYTHON_ADAPTER_PIN = AdapterPin(
     implementation_commit=PYTHON_COMMIT,
 )
 
-# Milestone 1: adapters support exactly this operation set (HARNESS.md
-# Section 20, Milestone 1).  The harness refuses adapters whose reported
+# Milestone 2: adapters support exactly this operation set (HARNESS.md
+# Section 20, Milestone 2).  The harness refuses adapters whose reported
 # capabilities differ from the campaign's requirements (Section 8).
+# validateCbor became runnable at the pinned conformance-API revision,
+# which added the public classified `followee::validate_cbor`.
 SUPPORTED_OPERATIONS = (
     "hello",
     "deriveIdentity",
     "authorRecord",
     "verifyRecord",
+    "strictEd25519",
+    "nextTimestamp",
+    "validateCbor",
+    "selectCurrent",
 )
+
+# Runner-contract limit domain for validateCbor (HARNESS.md 9.7): the
+# explicit limits applicable to a test, bounded by the specification's
+# record-body maxima (Section 15.1).  Values outside this domain are
+# adapter/input errors, never Followee conformance results.
+VALIDATE_CBOR_MAX_DEPTH = 8
+VALIDATE_CBOR_MAX_MEMBERS = 256

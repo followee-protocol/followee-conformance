@@ -16,11 +16,14 @@ use followee::contact::{
 };
 use followee::crypto;
 use followee::did::FolloweeDid;
+use followee::ordering::{select_current, AuthorityState};
 use followee::record::{
     encode_public_key, revocation_commitment, Authority, AuthorityDescriptor, RecordBody, SignError,
 };
-use followee::timestamp::{freshness, time_status, Freshness, TimeStatus};
-use followee::verify::{verify_record_for_target, VerifiedRecord};
+use followee::timestamp::{
+    freshness, next_timestamp, time_status, Freshness, TimeStatus, TimestampError,
+};
+use followee::verify::{verify_record, verify_record_for_target, VerifiedRecord};
 use serde_json::{json, Map, Value};
 
 use crate::StrictValue;
@@ -664,4 +667,143 @@ pub fn verify_record_op(input: StrictValue) -> Result<Value, OpError> {
         "stale": stale,
         "record": semantic_record_json(&record),
     }))
+}
+
+/// `strictEd25519` (HARNESS.md 9.5): calls the sole production strict
+/// verification entry point, `crypto::verify_followee_ed25519` — the same
+/// function used by complete record verification.
+///
+/// The implementation's public contract enforces specification 3.3 rules 1
+/// and 2 (exact 32-byte key, exact 64-byte signature) through its parameter
+/// types, as its documentation states ("by type").  A key or signature of
+/// any other length therefore cannot form a call at all; translating that
+/// documented contract, the adapter reports `valid: false` for such inputs
+/// without inventing any cryptographic judgement of its own.
+pub fn strict_ed25519(input: StrictValue) -> Result<Value, OpError> {
+    let mut fields = Fields::new(input, "strictEd25519 input")?;
+    let public_key = decode_hex(
+        &as_text(fields.take("publicKeyHex")?, "publicKeyHex")?,
+        "publicKeyHex",
+    )?;
+    let message = decode_hex(
+        &as_text(fields.take("messageHex")?, "messageHex")?,
+        "messageHex",
+    )?;
+    let signature = decode_hex(
+        &as_text(fields.take("signatureHex")?, "signatureHex")?,
+        "signatureHex",
+    )?;
+    fields.finish()?;
+
+    let valid = match (
+        <[u8; 32]>::try_from(public_key.as_slice()),
+        <[u8; 64]>::try_from(signature.as_slice()),
+    ) {
+        (Ok(key), Ok(sig)) => crypto::verify_followee_ed25519(&key, &message, &sig),
+        // Rules 1-2, enforced by the implementation's typed contract.
+        _ => false,
+    };
+    Ok(json!({ "valid": valid }))
+}
+
+/// `nextTimestamp` (HARNESS.md 9.6): calls the implementation's public
+/// signer timestamp algorithm with explicit values only.
+pub fn next_timestamp_op(input: StrictValue) -> Result<Value, OpError> {
+    let mut fields = Fields::new(input, "nextTimestamp input")?;
+    let now_ms = parse_u64(&as_text(fields.take("nowMs")?, "nowMs")?, "nowMs")?;
+    let previous = parse_opt_u64(fields.take("previousTimestampMs")?, "previousTimestampMs")?;
+    fields.finish()?;
+
+    Ok(match next_timestamp(now_ms, previous) {
+        Ok(value) => json!({ "timestampMs": value.to_string(), "error": Value::Null }),
+        Err(TimestampError::Overflow) => {
+            json!({ "timestampMs": Value::Null, "error": "overflow" })
+        }
+    })
+}
+
+/// `selectCurrent` (HARNESS.md 9.4): verifies every candidate for the
+/// explicit target through the implementation's full verification, then
+/// invokes its public selection behavior.  Candidates that fail
+/// verification cannot become `VerifiedRecord` values and are therefore
+/// excluded by the implementation's own type discipline, never rewritten.
+pub fn select_current_op(input: StrictValue) -> Result<Value, OpError> {
+    let mut fields = Fields::new(input, "selectCurrent input")?;
+    let target_text = as_text(fields.take("targetDid")?, "targetDid")?;
+    let candidates_in = as_array(fields.take("candidateEnvelopeHex")?, "candidateEnvelopeHex")?;
+    let now_ms = parse_u64(&as_text(fields.take("nowMs")?, "nowMs")?, "nowMs")?;
+    let sticky = match as_text(fields.take("stickyAuthority")?, "stickyAuthority")?.as_str() {
+        "unknown" => AuthorityState::Unknown,
+        "root" => AuthorityState::Root,
+        "rootRevoked" => AuthorityState::RootRevoked,
+        other => return Err(bad_input(format!("unknown stickyAuthority {other:?}"))),
+    };
+    fields.finish()?;
+
+    // The selection API takes a parsed target; a malformed target is the
+    // implementation's own DID classification.
+    let target = FolloweeDid::parse(&target_text).map_err(|e| OpError::Rejected {
+        error: followee::error::VerifyError::from(e).symbol(),
+    })?;
+
+    let mut verified: Vec<VerifiedRecord> = Vec::new();
+    let mut outcomes: Vec<Value> = Vec::new();
+    for (index, item) in candidates_in.into_iter().enumerate() {
+        let envelope = decode_hex(
+            &as_text(item, "candidateEnvelopeHex entry")?,
+            &format!("candidateEnvelopeHex[{index}]"),
+        )?;
+        match verify_record(&target, &envelope) {
+            Ok(record) => {
+                outcomes.push(Value::Null);
+                verified.push(record);
+            }
+            Err(e) => outcomes.push(Value::String(e.symbol().to_owned())),
+        }
+    }
+
+    let selection = select_current(&target, &verified, now_ms, sticky);
+    let winner = selection
+        .winner
+        .map(|record| Value::String(encode_hex(record.body_digest())));
+    let state = match selection.authority_state {
+        AuthorityState::Unknown => "unknown",
+        AuthorityState::Root => "root",
+        AuthorityState::RootRevoked => "rootRevoked",
+    };
+    Ok(json!({
+        "winnerRecordBodyDigestHex": winner.unwrap_or(Value::Null),
+        "authorityState": state,
+        "diagnostic": {
+            "followeeRust": { "candidateErrors": outcomes }
+        },
+    }))
+}
+
+/// `validateCbor` (HARNESS.md 9.7): calls the frozen implementation's
+/// public `followee::validate_cbor` — the same deterministic-CBOR
+/// validator the record path uses — with the explicit limits supplied by
+/// the case.  The runner contract bounds `maxDepth` to `0..=8` and
+/// `maxMembers` to `0..=256`; out-of-domain values are runner
+/// input-contract violations, never Followee conformance results.
+pub fn validate_cbor_op(input: StrictValue) -> Result<Value, OpError> {
+    let mut fields = Fields::new(input, "validateCbor input")?;
+    let cbor = decode_hex(&as_text(fields.take("cborHex")?, "cborHex")?, "cborHex")?;
+    let max_depth = parse_u64(&as_text(fields.take("maxDepth")?, "maxDepth")?, "maxDepth")?;
+    let max_members = parse_u64(
+        &as_text(fields.take("maxMembers")?, "maxMembers")?,
+        "maxMembers",
+    )?;
+    fields.finish()?;
+    if max_depth > 8 {
+        return Err(bad_input("maxDepth outside the runner domain 0..=8"));
+    }
+    if max_members > 256 {
+        return Err(bad_input("maxMembers outside the runner domain 0..=256"));
+    }
+
+    match followee::validate_cbor(&cbor, max_depth as u32, max_members as u32) {
+        Ok(()) => Ok(json!({ "valid": true })),
+        Err(e) => Err(OpError::Rejected { error: e.symbol() }),
+    }
 }

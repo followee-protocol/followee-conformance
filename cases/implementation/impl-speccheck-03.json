@@ -1,0 +1,30 @@
+{
+  "id": "impl-speccheck-03",
+  "runnerProtocol": "1",
+  "operation": "strictEd25519",
+  "specificationCommit": "abc9a55d90f1026e6509207abda73e5dc6d14241",
+  "specificationSections": [
+    "Section 3.3"
+  ],
+  "derivationStatus": "implementation",
+  "faultProfile": "unknown",
+  "expected": {
+    "outcome": "accepted"
+  },
+  "input": {
+    "publicKeyHex": "cdb267ce40c5cd45306fa5d2f29731459387dbf9eb933b7bd5aed9a765b88d4d",
+    "messageHex": "9bd9f44f4dcc75bd531b56b2cd280b0bb38fc1cd6d1230e14861d861de092e79",
+    "signatureHex": "9046a64750444938de19f227bb80485e92b83fdb4b6506c160484c016cc1852f87909e14428a7a1d62e9f22f3d3ad7802db02eb2e688b6c52fcd6648a98bd009"
+  },
+  "expectedResult": {
+    "valid": false
+  },
+  "provenance": {
+    "sourceManifest": "implementations/followee-rs/fixtures/external/PROVENANCE.json",
+    "sourceFile": "implementations/followee-rs/fixtures/external/ed25519_speccheck_cases.json",
+    "sourceFileSha256": "08e47a36d9aead288664930505584f353fff113ab854f2800db1e4f5b3540450",
+    "upstream": "https://github.com/novifinancial/ed25519-speccheck",
+    "upstreamOrigin": "Chalkias, Garillot, Nikolaenko: 'Taming the many EdDSAs' (SSR 2020) cross-implementation edge-case vectors",
+    "vectorIndex": "3"
+  }
+}

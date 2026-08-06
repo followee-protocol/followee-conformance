@@ -77,6 +77,10 @@ jobs:
         run: cargo build --manifest-path adapters/rust/Cargo.toml --locked
       - name: tests
         run: cargo test --manifest-path adapters/rust/Cargo.toml --locked
+      - name: fixture-builder format
+        run: cargo fmt --manifest-path tools/fixture-builder/Cargo.toml -- --check
+      - name: fixture-builder clippy
+        run: cargo clippy --manifest-path tools/fixture-builder/Cargo.toml --locked -- -D warnings
 
   handshake:
     name: hello handshake and pin refusal
@@ -97,5 +101,7 @@ jobs:
         run: sh scripts/negative_pin_test.sh
       - name: specification corpus matches its builder (no drift)
         run: python3 scripts/build_specification_corpus.py --check
+      - name: implementation corpus matches its builder (no drift)
+        run: python3 scripts/build_implementation_corpus.py --check
       - name: specification-status differential campaign
         run: python3 -m harness.campaign

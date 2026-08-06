@@ -41,7 +41,16 @@ ADAPTER_VERSION = "1"
 IMPLEMENTATION_REPOSITORY = (
     "https://github.com/followee-protocol/followee-python-cleanroom"
 )
-OPERATIONS = ["hello", "deriveIdentity", "authorRecord", "verifyRecord"]
+OPERATIONS = [
+    "hello",
+    "deriveIdentity",
+    "authorRecord",
+    "verifyRecord",
+    "strictEd25519",
+    "nextTimestamp",
+    "validateCbor",
+    "selectCurrent",
+]
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 MODEL_SUBMODULE = REPO_ROOT / "implementations" / "followee-python-cleanroom"
@@ -131,9 +140,11 @@ def load_model() -> SimpleNamespace:
             cose,
             descriptor,
             detcbor,
+            did,
             ed25519,
             errors,
             record,
+            selection,
             signing,
             verify,
         )
@@ -147,9 +158,11 @@ def load_model() -> SimpleNamespace:
         cose=cose,
         descriptor=descriptor,
         detcbor=detcbor,
+        did=did,
         ed25519=ed25519,
         errors=errors,
         record=record,
+        selection=selection,
         signing=signing,
         verify=verify,
     )
@@ -658,6 +671,131 @@ def op_verify_record(model: SimpleNamespace, input_value: Any) -> dict[str, Any]
     }
 
 
+def op_strict_ed25519(model: SimpleNamespace, input_value: Any) -> dict[str, Any]:
+    """HARNESS.md 9.5: calls the model's strict verifier — the same
+    ``verify_strict`` entry point its record verification uses.  The model
+    itself classifies malformed key and signature lengths (specification
+    3.3 rules 1-2) by returning False."""
+    members = _take_members(
+        input_value,
+        "strictEd25519 input",
+        ("publicKeyHex", "messageHex", "signatureHex"),
+    )
+    public_key = _decode_hex(members["publicKeyHex"], "publicKeyHex")
+    message = _decode_hex(members["messageHex"], "messageHex")
+    signature = _decode_hex(members["signatureHex"], "signatureHex")
+    valid = model.ed25519.verify_strict(public_key, message, signature)
+    return {"valid": bool(valid)}
+
+
+def op_next_timestamp(model: SimpleNamespace, input_value: Any) -> dict[str, Any]:
+    """HARNESS.md 9.6: calls the model's public signer timestamp
+    algorithm; its OverflowError classification maps to the portable
+    'overflow' symbol."""
+    members = _take_members(
+        input_value, "nextTimestamp input", ("nowMs", "previousTimestampMs")
+    )
+    now_ms = _parse_u64(members["nowMs"], "nowMs")
+    previous = _parse_opt_u64(members["previousTimestampMs"], "previousTimestampMs")
+    try:
+        value = model.signing.next_timestamp(now_ms, previous)
+    except OverflowError:
+        return {"timestampMs": None, "error": "overflow"}
+    return {"timestampMs": str(value), "error": None}
+
+
+def op_validate_cbor(model: SimpleNamespace, input_value: Any) -> dict[str, Any]:
+    """HARNESS.md 9.7: calls the frozen model's public deterministic-CBOR
+    decoder — the same ``detcbor.decode`` entry point its record
+    verification uses — with the explicit limits supplied by the case.
+    The runner contract bounds maxDepth to 0..=8 and maxMembers to
+    0..=256; out-of-domain values are runner input-contract violations,
+    never Followee conformance results."""
+    members = _take_members(
+        input_value, "validateCbor input", ("cborHex", "maxDepth", "maxMembers")
+    )
+    cbor = _decode_hex(members["cborHex"], "cborHex")
+    max_depth = _parse_u64(members["maxDepth"], "maxDepth")
+    max_members = _parse_u64(members["maxMembers"], "maxMembers")
+    if max_depth > 8:
+        raise _bad_input("maxDepth outside the runner domain 0..=8")
+    if max_members > 256:
+        raise _bad_input("maxMembers outside the runner domain 0..=256")
+    try:
+        model.detcbor.decode(cbor, max_depth=max_depth, max_members=max_members)
+    except model.errors.FolloweeError as exc:
+        raise OpRejected(_followee_symbol(model, exc)) from exc
+    return {"valid": True}
+
+
+def op_select_current(model: SimpleNamespace, input_value: Any) -> dict[str, Any]:
+    """HARNESS.md 9.4: passes every candidate envelope to the model's
+    public ``select_current``, which verifies each candidate itself and
+    applies sticky root revocation and deterministic ordering.
+
+    Authority-state mapping: the model's public selection state is the
+    sticky root-revocation flag.  The runner's three-valued
+    ``authorityState`` is reported as ``rootRevoked`` when that flag is
+    set, ``root`` when a Root winner was selected, and otherwise the
+    caller's own supplied ``stickyAuthority`` — i.e. an outcome that
+    selects nothing leaves the caller's state unchanged, exactly the
+    contract the runner protocol defines for sticky state.
+    """
+    members = _take_members(
+        input_value,
+        "selectCurrent input",
+        ("targetDid", "candidateEnvelopeHex", "nowMs", "stickyAuthority"),
+    )
+    target = _text(members["targetDid"], "targetDid")
+    candidates = [
+        _decode_hex(item, f"candidateEnvelopeHex[{index}]")
+        for index, item in enumerate(
+            _array(members["candidateEnvelopeHex"], "candidateEnvelopeHex")
+        )
+    ]
+    now_ms = _parse_u64(members["nowMs"], "nowMs")
+    sticky = _text(members["stickyAuthority"], "stickyAuthority")
+    if sticky not in ("unknown", "root", "rootRevoked"):
+        raise _bad_input(f"unknown stickyAuthority {sticky!r}")
+
+    # Selection is defined for a parsed target (specification 8.1 step 6);
+    # the model's public DID parser classifies a malformed target, exactly
+    # as the Rust selection API's typed target parameter does.
+    try:
+        model.did.parse_did(target)
+    except model.errors.FolloweeError as exc:
+        raise OpRejected(_followee_symbol(model, exc)) from exc
+
+    result = model.selection.select_current(
+        target,
+        candidates,
+        now_ms,
+        sticky_root_revoked=(sticky == "rootRevoked"),
+    )
+    if result.root_revoked:
+        state = "rootRevoked"
+    elif result.winner is not None:
+        state = "root"
+    else:
+        state = sticky
+    return {
+        "winnerRecordBodyDigestHex": (
+            None if result.winner is None else result.winner.body_digest.hex()
+        ),
+        "authorityState": state,
+        "diagnostic": {
+            "followeePythonCleanroom": {
+                "candidateErrors": [
+                    None
+                    if outcome.error is None
+                    else model.errors.ERROR_NAMES[outcome.error]
+                    for outcome in result.outcomes
+                ]
+            }
+        },
+    }
+
+
 # ---------------------------------------------------------------------------
 # Strict request parsing and dispatch (HARNESS.md 7.1-7.3)
 # ---------------------------------------------------------------------------
@@ -789,6 +927,10 @@ def handle_line(
             "result": identity,
         }
     handlers = {
+        "strictEd25519": op_strict_ed25519,
+        "nextTimestamp": op_next_timestamp,
+        "validateCbor": op_validate_cbor,
+        "selectCurrent": op_select_current,
         "deriveIdentity": op_derive_identity,
         "authorRecord": op_author_record,
         "verifyRecord": op_verify_record,

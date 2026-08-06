@@ -91,7 +91,7 @@ def chain_verify_result(stale: bool) -> dict:
 def chained_responses(after_horizon_stale: bool = True):
     def build() -> dict:
         return {
-            f"{CHAIN_ID}-author": {
+            f"{CHAIN_ID}-author-record": {
                 "status": "accepted",
                 "result": chain_author_result(),
             },
@@ -102,6 +102,13 @@ def chained_responses(after_horizon_stale: bool = True):
             f"{CHAIN_ID}-verify-after-horizon": {
                 "status": "accepted",
                 "result": chain_verify_result(after_horizon_stale),
+            },
+            f"{CHAIN_ID}-select-stale-candidate": {
+                "status": "accepted",
+                "result": {
+                    "winnerRecordBodyDigestHex": "11" * 32,
+                    "authorityState": "root",
+                },
             },
         }
 
@@ -120,14 +127,14 @@ def hello_result(pin: pins.AdapterPin) -> dict:
     }
 
 
-def case_manifest(case_id: str, expected: dict) -> dict:
+def case_manifest(case_id: str, expected: dict, status: str = "specification") -> dict:
     return {
         "id": case_id,
         "runnerProtocol": "1",
         "operation": "deriveIdentity",
         "specificationCommit": pins.SPECIFICATION_COMMIT,
         "specificationSections": ["Appendix B.2"],
-        "derivationStatus": "specification",
+        "derivationStatus": status,
         "faultProfile": "none" if expected["outcome"] == "accepted" else "single",
         "expected": expected,
         "input": {"rootSeedHex": ZERO32, "revocationSeedHex": ZERO32},
@@ -295,7 +302,7 @@ class CampaignEndToEndTests(unittest.TestCase):
         self.write_cases([])
         code, out, err = self.run_campaign(*chained_responses(), only=CHAIN_ID)
         self.assertEqual(code, 0, err)
-        self.assertIn("chained scenarios:         1 (3 steps", out)
+        self.assertIn("chained scenarios:         1 (4 steps", out)
 
     def test_chained_hard_coded_stale_fails_with_artifact(self):
         # An adapter pair agreeing on stale=false past the horizon (a
@@ -326,7 +333,9 @@ class CampaignEndToEndTests(unittest.TestCase):
         # onward: only the author step runs and fails.
         self.write_cases([])
         rust, python = chained_responses()
-        python["chain-valid-until-stale-author"]["result"]["envelopeHex"] = "d2ff"
+        python["chain-valid-until-stale-author-record"]["result"]["envelopeHex"] = (
+            "d2ff"
+        )
         code, out, _ = self.run_campaign(rust, python, only=CHAIN_ID)
         self.assertEqual(code, 3)
         self.assertIn("(1 steps", out)
@@ -336,6 +345,41 @@ class CampaignEndToEndTests(unittest.TestCase):
                 / "disagreement-chain-valid-until-stale-verify-at-horizon.json"
             ).exists()
         )
+
+    def test_agreed_implementation_case_is_proposed_for_promotion(self):
+        self.write_cases(
+            [case_manifest("impl-1", {"outcome": "accepted"}, status="implementation")]
+        )
+        accepted = {"status": "accepted", "result": GOOD_RESULT}
+        code, out, _ = self.run_campaign(
+            {"impl-1": accepted}, {"impl-1": accepted}, only="impl-1"
+        )
+        self.assertEqual(code, 0)
+        self.assertIn("promotion proposal: 1 of 1", out)
+        proposal = json.loads((self.report_dir / "promotion-proposal.json").read_text())
+        entry = proposal["cases"][0]
+        self.assertEqual(entry["caseId"], "impl-1")
+        self.assertEqual(entry["currentStatus"], "implementation")
+        self.assertEqual(entry["proposedStatus"], "confirmed")
+        self.assertTrue(entry["independentAgreement"])
+        self.assertIn("requires review", proposal["note"])
+
+    def test_disagreed_implementation_case_is_not_proposed(self):
+        self.write_cases(
+            [case_manifest("impl-2", {"outcome": "accepted"}, status="implementation")]
+        )
+        mutated = dict(GOOD_RESULT)
+        mutated["did"] = "did:flw:z2222"
+        code, _, _ = self.run_campaign(
+            {"impl-2": {"status": "accepted", "result": GOOD_RESULT}},
+            {"impl-2": {"status": "accepted", "result": mutated}},
+            only="impl-2",
+        )
+        self.assertEqual(code, 3, "disagreement is retained and fails")
+        proposal = json.loads((self.report_dir / "promotion-proposal.json").read_text())
+        entry = proposal["cases"][0]
+        self.assertEqual(entry["proposedStatus"], "implementation")
+        self.assertFalse(entry["independentAgreement"])
 
     def test_tampered_case_file_is_refused_before_execution(self):
         self.write_cases([case_manifest("agree-1", {"outcome": "accepted"})])

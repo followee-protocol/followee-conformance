@@ -1,0 +1,22 @@
+{
+  "id": "validate-cbor-zero-limits-null",
+  "runnerProtocol": "1",
+  "operation": "validateCbor",
+  "specificationCommit": "abc9a55d90f1026e6509207abda73e5dc6d14241",
+  "specificationSections": [
+    "Section 15.1"
+  ],
+  "derivationStatus": "specification",
+  "faultProfile": "none",
+  "expected": {
+    "outcome": "accepted"
+  },
+  "input": {
+    "cborHex": "f6",
+    "maxDepth": "0",
+    "maxMembers": "0"
+  },
+  "expectedResult": {
+    "valid": true
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "id": "validate-cbor-depth-9-rejected",
+  "runnerProtocol": "1",
+  "operation": "validateCbor",
+  "specificationCommit": "abc9a55d90f1026e6509207abda73e5dc6d14241",
+  "specificationSections": [
+    "Section 15.1"
+  ],
+  "derivationStatus": "specification",
+  "faultProfile": "single",
+  "expected": {
+    "outcome": "rejected",
+    "errorAssertion": "exact",
+    "error": "schemaViolation"
+  },
+  "input": {
+    "cborHex": "81818181818181818101",
+    "maxDepth": "8",
+    "maxMembers": "256"
+  }
+}

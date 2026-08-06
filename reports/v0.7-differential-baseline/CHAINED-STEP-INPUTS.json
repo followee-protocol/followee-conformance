@@ -1,0 +1,175 @@
+{
+  "note": "Exact inputs of every dynamically generated chained-scenario step executed by the baseline campaign, in execution order. Envelope bytes are included verbatim (hex), so every baseline comparison is reconstructable without re-running the authoring steps. inputSha256 is the SHA-256 of the canonical JSON serialization (sorted keys, compact separators) of the input object. Provenance: intermediate envelopes are run-time output of both frozen implementations, admitted only after their complete authorRecord results agreed byte-for-byte; they are not specification-published material.",
+  "scenarios": [
+    "chain-valid-until-stale",
+    "chain-select-equal-time"
+  ],
+  "steps": [
+    {
+      "caseId": "chain-valid-until-stale-author-record",
+      "input": {
+        "authority": "root",
+        "contact": {
+          "alsoKnownAs": [
+            "acct:alice@example.com"
+          ],
+          "avatar": null,
+          "displayName": "Alice Example",
+          "extensions": {},
+          "migration": null,
+          "services": [
+            {
+              "endpoint": "https://alice.example/feed.xml",
+              "id": "feed",
+              "label": "Writing",
+              "language": null,
+              "mediaType": "application/atom+xml",
+              "rel": null,
+              "type": "Feed"
+            }
+          ],
+          "summary": "Writer"
+        },
+        "extensions": {},
+        "revocationSeedHex": "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+        "rootSeedHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+        "signingSeed": "root",
+        "timestampMs": "1785589200123",
+        "validUntilMs": "1785589260123"
+      },
+      "inputSha256": "20284bf07214997b61bcebde5194eb07fc367c30f7ea7c88539cb254c0219c8a",
+      "operation": "authorRecord"
+    },
+    {
+      "caseId": "chain-valid-until-stale-verify-at-horizon",
+      "input": {
+        "envelopeHex": "d28443a10132a0590122a700010178376469643a666c773a7a516d5063477374426137775739686f59516253364a5a345578775a6d6f4b7237595666397937717869794433436d021b0000019fbd68f4fb030004a3000101a2003201582003a107bff3ce10be1d70dd18e74bc09967e4d6309ba50d5f1ddc8664125531b8025820d123bafb7ae35472d9a73944d98314a38ff8f201d79c32e640f97a27bec880de061b0000019fbd69df5b07a4006d416c696365204578616d706c650166577269746572038176616363743a616c696365406578616d706c652e636f6d0481a500646665656401644665656402781e68747470733a2f2f616c6963652e6578616d706c652f666565642e786d6c03746170706c69636174696f6e2f61746f6d2b786d6c046757726974696e675840c3c1987bd4434462e9324e553ee3798fcb42dd806f15ee154bb7bde530f11fea503695fe9a3da4e2b4c754ed86f4e1e94d30ee79f92c537b72078c181fb1b20e",
+        "nowMs": "1785589260123",
+        "targetDid": "did:flw:zQmPcGstBa7wW9hoYQbS6JZ4UxwZmoKr7YVf9y7qxiyD3Cm"
+      },
+      "inputSha256": "f58ef456accf7bac9b24eac677499559c11b175f9814069b1db2cb88a3091d3d",
+      "operation": "verifyRecord"
+    },
+    {
+      "caseId": "chain-valid-until-stale-verify-after-horizon",
+      "input": {
+        "envelopeHex": "d28443a10132a0590122a700010178376469643a666c773a7a516d5063477374426137775739686f59516253364a5a345578775a6d6f4b7237595666397937717869794433436d021b0000019fbd68f4fb030004a3000101a2003201582003a107bff3ce10be1d70dd18e74bc09967e4d6309ba50d5f1ddc8664125531b8025820d123bafb7ae35472d9a73944d98314a38ff8f201d79c32e640f97a27bec880de061b0000019fbd69df5b07a4006d416c696365204578616d706c650166577269746572038176616363743a616c696365406578616d706c652e636f6d0481a500646665656401644665656402781e68747470733a2f2f616c6963652e6578616d706c652f666565642e786d6c03746170706c69636174696f6e2f61746f6d2b786d6c046757726974696e675840c3c1987bd4434462e9324e553ee3798fcb42dd806f15ee154bb7bde530f11fea503695fe9a3da4e2b4c754ed86f4e1e94d30ee79f92c537b72078c181fb1b20e",
+        "nowMs": "1785589260124",
+        "targetDid": "did:flw:zQmPcGstBa7wW9hoYQbS6JZ4UxwZmoKr7YVf9y7qxiyD3Cm"
+      },
+      "inputSha256": "0140e2fe670df99cd0ae527466f1f5db0daa2d7d1389399c99f91e4e1dec3fe0",
+      "operation": "verifyRecord"
+    },
+    {
+      "caseId": "chain-valid-until-stale-select-stale-candidate",
+      "input": {
+        "candidateEnvelopeHex": [
+          "d28443a10132a0590122a700010178376469643a666c773a7a516d5063477374426137775739686f59516253364a5a345578775a6d6f4b7237595666397937717869794433436d021b0000019fbd68f4fb030004a3000101a2003201582003a107bff3ce10be1d70dd18e74bc09967e4d6309ba50d5f1ddc8664125531b8025820d123bafb7ae35472d9a73944d98314a38ff8f201d79c32e640f97a27bec880de061b0000019fbd69df5b07a4006d416c696365204578616d706c650166577269746572038176616363743a616c696365406578616d706c652e636f6d0481a500646665656401644665656402781e68747470733a2f2f616c6963652e6578616d706c652f666565642e786d6c03746170706c69636174696f6e2f61746f6d2b786d6c046757726974696e675840c3c1987bd4434462e9324e553ee3798fcb42dd806f15ee154bb7bde530f11fea503695fe9a3da4e2b4c754ed86f4e1e94d30ee79f92c537b72078c181fb1b20e"
+        ],
+        "nowMs": "1785589260124",
+        "stickyAuthority": "unknown",
+        "targetDid": "did:flw:zQmPcGstBa7wW9hoYQbS6JZ4UxwZmoKr7YVf9y7qxiyD3Cm"
+      },
+      "inputSha256": "a41c62defd3130a6c2cca771f243f5831234c0edba660471831aa9e7496c91d0",
+      "operation": "selectCurrent"
+    },
+    {
+      "caseId": "chain-select-equal-time-author-alice-a",
+      "input": {
+        "authority": "root",
+        "contact": {
+          "alsoKnownAs": [
+            "acct:alice@example.com"
+          ],
+          "avatar": null,
+          "displayName": "Alice A",
+          "extensions": {},
+          "migration": null,
+          "services": [
+            {
+              "endpoint": "https://alice.example/feed.xml",
+              "id": "feed",
+              "label": "Writing",
+              "language": null,
+              "mediaType": "application/atom+xml",
+              "rel": null,
+              "type": "Feed"
+            }
+          ],
+          "summary": "Writer"
+        },
+        "extensions": {},
+        "revocationSeedHex": "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+        "rootSeedHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+        "signingSeed": "root",
+        "timestampMs": "1785589200123",
+        "validUntilMs": null
+      },
+      "inputSha256": "32f46e15f4e153d77b30b4aa8f1ffaaa75b23663d6c8cdc63be75ab9cdde5e7f",
+      "operation": "authorRecord"
+    },
+    {
+      "caseId": "chain-select-equal-time-author-alice-b",
+      "input": {
+        "authority": "root",
+        "contact": {
+          "alsoKnownAs": [
+            "acct:alice@example.com"
+          ],
+          "avatar": null,
+          "displayName": "Alice B",
+          "extensions": {},
+          "migration": null,
+          "services": [
+            {
+              "endpoint": "https://alice.example/feed.xml",
+              "id": "feed",
+              "label": "Writing",
+              "language": null,
+              "mediaType": "application/atom+xml",
+              "rel": null,
+              "type": "Feed"
+            }
+          ],
+          "summary": "Writer"
+        },
+        "extensions": {},
+        "revocationSeedHex": "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+        "rootSeedHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+        "signingSeed": "root",
+        "timestampMs": "1785589200123",
+        "validUntilMs": null
+      },
+      "inputSha256": "01cc70c34528b4e43966040749e9e8f85652fa9d467bb22fb7f06f1c75e8664a",
+      "operation": "authorRecord"
+    },
+    {
+      "caseId": "chain-select-equal-time-select-a-then-b",
+      "input": {
+        "candidateEnvelopeHex": [
+          "d28443a10132a0590112a600010178376469643a666c773a7a516d5063477374426137775739686f59516253364a5a345578775a6d6f4b7237595666397937717869794433436d021b0000019fbd68f4fb030004a3000101a2003201582003a107bff3ce10be1d70dd18e74bc09967e4d6309ba50d5f1ddc8664125531b8025820d123bafb7ae35472d9a73944d98314a38ff8f201d79c32e640f97a27bec880de07a40067416c69636520410166577269746572038176616363743a616c696365406578616d706c652e636f6d0481a500646665656401644665656402781e68747470733a2f2f616c6963652e6578616d706c652f666565642e786d6c03746170706c69636174696f6e2f61746f6d2b786d6c046757726974696e675840d71819f7b883a3263cd186c29575d4109ef0bac02ea36e44230e4af1b4ca4fec7950ffa0f9876367a36ecee8683f87941905efd4b4aa59fca36ad3d3f3960407",
+          "d28443a10132a0590112a600010178376469643a666c773a7a516d5063477374426137775739686f59516253364a5a345578775a6d6f4b7237595666397937717869794433436d021b0000019fbd68f4fb030004a3000101a2003201582003a107bff3ce10be1d70dd18e74bc09967e4d6309ba50d5f1ddc8664125531b8025820d123bafb7ae35472d9a73944d98314a38ff8f201d79c32e640f97a27bec880de07a40067416c69636520420166577269746572038176616363743a616c696365406578616d706c652e636f6d0481a500646665656401644665656402781e68747470733a2f2f616c6963652e6578616d706c652f666565642e786d6c03746170706c69636174696f6e2f61746f6d2b786d6c046757726974696e675840f1697e217a94bba916a6ef20176117765ddfce3251b629e3738d138b4873baa21b4c8b9458a532eeb14c1ca9f4e56a7e0e1aa38be4c5061238051978edfb2500"
+        ],
+        "nowMs": "1785589200123",
+        "stickyAuthority": "unknown",
+        "targetDid": "did:flw:zQmPcGstBa7wW9hoYQbS6JZ4UxwZmoKr7YVf9y7qxiyD3Cm"
+      },
+      "inputSha256": "5c78c51e37d6b9f88f7cacdb1913878a871f82da55c24ca637234cb1900e2fee",
+      "operation": "selectCurrent"
+    },
+    {
+      "caseId": "chain-select-equal-time-select-b-then-a",
+      "input": {
+        "candidateEnvelopeHex": [
+          "d28443a10132a0590112a600010178376469643a666c773a7a516d5063477374426137775739686f59516253364a5a345578775a6d6f4b7237595666397937717869794433436d021b0000019fbd68f4fb030004a3000101a2003201582003a107bff3ce10be1d70dd18e74bc09967e4d6309ba50d5f1ddc8664125531b8025820d123bafb7ae35472d9a73944d98314a38ff8f201d79c32e640f97a27bec880de07a40067416c69636520420166577269746572038176616363743a616c696365406578616d706c652e636f6d0481a500646665656401644665656402781e68747470733a2f2f616c6963652e6578616d706c652f666565642e786d6c03746170706c69636174696f6e2f61746f6d2b786d6c046757726974696e675840f1697e217a94bba916a6ef20176117765ddfce3251b629e3738d138b4873baa21b4c8b9458a532eeb14c1ca9f4e56a7e0e1aa38be4c5061238051978edfb2500",
+          "d28443a10132a0590112a600010178376469643a666c773a7a516d5063477374426137775739686f59516253364a5a345578775a6d6f4b7237595666397937717869794433436d021b0000019fbd68f4fb030004a3000101a2003201582003a107bff3ce10be1d70dd18e74bc09967e4d6309ba50d5f1ddc8664125531b8025820d123bafb7ae35472d9a73944d98314a38ff8f201d79c32e640f97a27bec880de07a40067416c69636520410166577269746572038176616363743a616c696365406578616d706c652e636f6d0481a500646665656401644665656402781e68747470733a2f2f616c6963652e6578616d706c652f666565642e786d6c03746170706c69636174696f6e2f61746f6d2b786d6c046757726974696e675840d71819f7b883a3263cd186c29575d4109ef0bac02ea36e44230e4af1b4ca4fec7950ffa0f9876367a36ecee8683f87941905efd4b4aa59fca36ad3d3f3960407"
+        ],
+        "nowMs": "1785589200123",
+        "stickyAuthority": "unknown",
+        "targetDid": "did:flw:zQmPcGstBa7wW9hoYQbS6JZ4UxwZmoKr7YVf9y7qxiyD3Cm"
+      },
+      "inputSha256": "0370ad054a5e85e8e8931b0df2402637dc6a0f12338187be935a58f0faf1178e",
+      "operation": "selectCurrent"
+    }
+  ]
+}

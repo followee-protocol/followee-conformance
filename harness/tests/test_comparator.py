@@ -228,6 +228,119 @@ class ComparatorSensitivityTests(unittest.TestCase):
         self.assertEqual(c.differences[0].rule, RULE_RESULT_EQUALITY)
         self.assertEqual(c.differences[0].path, "stale")
 
+    def test_strict_valid_flag_disagreement_is_detected(self):
+        c = self.compare(
+            ACCEPTED,
+            accepted({"valid": True}),
+            accepted({"valid": False}),
+            operation="strictEd25519",
+        )
+        self.assertFalse(c.agreed)
+        self.assertEqual(c.differences[0].path, "valid")
+
+    def test_next_timestamp_value_disagreement_is_detected(self):
+        c = self.compare(
+            ACCEPTED,
+            accepted({"timestampMs": "201", "error": None}),
+            accepted({"timestampMs": "202", "error": None}),
+            operation="nextTimestamp",
+        )
+        self.assertFalse(c.agreed)
+        self.assertEqual(c.differences[0].path, "timestampMs")
+
+    def test_overflow_versus_value_disagreement_is_detected(self):
+        c = self.compare(
+            ACCEPTED,
+            accepted({"timestampMs": "18446744073709551615", "error": None}),
+            accepted({"timestampMs": None, "error": "overflow"}),
+            operation="nextTimestamp",
+        )
+        self.assertFalse(c.agreed)
+        self.assertEqual({d.path for d in c.differences}, {"timestampMs", "error"})
+
+    def test_select_winner_digest_one_byte_disagreement_is_detected(self):
+        left = {"winnerRecordBodyDigestHex": "aa" * 32, "authorityState": "root"}
+        right = {
+            "winnerRecordBodyDigestHex": "ab" + "aa" * 31,
+            "authorityState": "root",
+        }
+        c = self.compare(
+            ACCEPTED, accepted(left), accepted(right), operation="selectCurrent"
+        )
+        self.assertFalse(c.agreed)
+        self.assertEqual(c.differences[0].path, "winnerRecordBodyDigestHex")
+
+    def test_select_winner_null_versus_digest_is_detected(self):
+        c = self.compare(
+            ACCEPTED,
+            accepted({"winnerRecordBodyDigestHex": None, "authorityState": "root"}),
+            accepted(
+                {
+                    "winnerRecordBodyDigestHex": "aa" * 32,
+                    "authorityState": "root",
+                }
+            ),
+            operation="selectCurrent",
+        )
+        self.assertFalse(c.agreed)
+
+    def test_select_authority_state_disagreement_is_detected(self):
+        c = self.compare(
+            ACCEPTED,
+            accepted(
+                {
+                    "winnerRecordBodyDigestHex": None,
+                    "authorityState": "rootRevoked",
+                }
+            ),
+            accepted({"winnerRecordBodyDigestHex": None, "authorityState": "root"}),
+            operation="selectCurrent",
+        )
+        self.assertFalse(c.agreed)
+        self.assertEqual(c.differences[0].path, "authorityState")
+
+    def test_validate_cbor_acceptance_disagreement_is_detected(self):
+        c = self.compare(
+            ACCEPTED,
+            accepted({"valid": True}),
+            rejected("invalidCbor"),
+            operation="validateCbor",
+        )
+        self.assertFalse(c.agreed)
+        self.assertEqual(c.differences[0].rule, RULE_ACCEPTANCE)
+
+    def test_validate_cbor_classification_disagreements_are_detected(self):
+        # Each classification pair must fail under an exact assertion.
+        for required, other in [
+            ("invalidCbor", "nonDeterministicCbor"),
+            ("nonDeterministicCbor", "schemaViolation"),
+            ("schemaViolation", "invalidCbor"),
+        ]:
+            c = self.compare(
+                {
+                    "outcome": "rejected",
+                    "errorAssertion": "exact",
+                    "error": required,
+                },
+                rejected(required),
+                rejected(other),
+                operation="validateCbor",
+            )
+            self.assertFalse(c.agreed, f"{required} vs {other}")
+            self.assertEqual(c.differences[0].rule, RULE_EXACT_ERROR)
+
+    def test_validate_cbor_unspecified_retains_divergent_classifications(self):
+        # The recorded invalid-UTF-8 divergence: both reject, symbols kept.
+        c = self.compare(
+            REJECTED_UNSPECIFIED,
+            rejected("invalidCbor"),
+            rejected("nonDeterministicCbor"),
+            operation="validateCbor",
+        )
+        self.assertTrue(c.agreed)
+        self.assertEqual(c.rust_error, "invalidCbor")
+        self.assertEqual(c.python_error, "nonDeterministicCbor")
+
     def test_diagnostic_member_is_excluded_from_equality(self):
         with_diag = derive_result()
         with_diag["diagnostic"] = {"followeeRust": {"elapsedNs": "12"}}

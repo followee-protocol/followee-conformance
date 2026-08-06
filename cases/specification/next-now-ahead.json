@@ -1,0 +1,22 @@
+{
+  "id": "next-now-ahead",
+  "runnerProtocol": "1",
+  "operation": "nextTimestamp",
+  "specificationCommit": "abc9a55d90f1026e6509207abda73e5dc6d14241",
+  "specificationSections": [
+    "Section 5.3"
+  ],
+  "derivationStatus": "specification",
+  "faultProfile": "none",
+  "expected": {
+    "outcome": "accepted"
+  },
+  "input": {
+    "nowMs": "1785589205123",
+    "previousTimestampMs": "1785589200123"
+  },
+  "expectedResult": {
+    "timestampMs": "1785589205123",
+    "error": null
+  }
+}

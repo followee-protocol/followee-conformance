@@ -62,7 +62,7 @@ class CampaignRunner:
     def __init__(
         self,
         repo_root: Path,
-        cases_dir: Path,
+        cases_dirs: list[Path],
         report_dir: Path,
         timeout: float,
         rust_override: str | None,
@@ -71,7 +71,7 @@ class CampaignRunner:
         only: str | None,
     ) -> None:
         self.repo_root = repo_root
-        self.cases_dir = cases_dir
+        self.cases_dirs = cases_dirs
         self.report_dir = report_dir
         self.timeout = timeout
         self.rust_override = rust_override
@@ -86,6 +86,10 @@ class CampaignRunner:
         self.comparisons: list[Comparison] = []
         self.chained_scenarios = 0
         self.chained_steps = 0
+        # Exact requests executed, in order: (caseId, operation, input).
+        # Chained-step inputs are produced at run time, so baseline
+        # tooling reads them from here to archive reconstructable inputs.
+        self.executed_requests: list[tuple[str, str, dict[str, Any]]] = []
 
     # -- response validation -------------------------------------------------
 
@@ -182,10 +186,7 @@ class CampaignRunner:
             ),
             "infrastructureFailure": failure,
             "environment": self._environment(),
-            "reproduceCommand": (
-                "python3 -m harness.campaign --cases "
-                f"{self.cases_dir} --only {case.case_id}"
-            ),
+            "reproduceCommand": (f"python3 -m harness.campaign --only {case.case_id}"),
         }
         path = self.report_dir / f"disagreement-{case.case_id}.json"
         path.write_text(
@@ -202,6 +203,7 @@ class CampaignRunner:
         """Send one identical request to both adapters; return validated
         responses, or record an infrastructure failure and return None."""
         request = case.request()
+        self.executed_requests.append((case.case_id, case.operation, case.input))
         # HARNESS.md Section 3: both implementations receive identical
         # neutral input; the identical request object is serialized once
         # per adapter by the same strict encoder.
@@ -288,52 +290,54 @@ class CampaignRunner:
         python: AdapterProcess,
     ) -> None:
         scenario_id = scenario["id"]
-        author_id = f"{scenario_id}-author"
-        author_case = Case(
-            case_id=author_id,
-            operation="authorRecord",
-            input=scenario["authorInput"],
-            manifest={
-                **chained.step_manifest(scenario, author_id, None),
-                "expected": {"outcome": "accepted"},
-            },
-            path=self.cases_dir,
-        )
-        self.chained_steps += 1
-        responses = self._exchange(author_case, rust, python)
-        if responses is None:
-            return
-        comparison = self._compare_and_record(author_case, responses, rust, python)
-        # The verify steps run only on an envelope both implementations
-        # produced identically; a disagreement or rejection aborts the
-        # scenario rather than feeding mismatched bytes onward.
-        if not comparison.agreed or responses["rust"]["status"] != "accepted":
-            return
-        agreed_result = responses["rust"]["result"]
-        envelope_hex = agreed_result["envelopeHex"]
-        target_did = agreed_result["did"]
 
-        for step in scenario["verifySteps"]:
-            step_id = f"{scenario_id}-{step['suffix']}"
-            verify_case = Case(
+        # Author phase: every follow-up step runs only on envelopes both
+        # implementations produced identically; a disagreement or rejection
+        # aborts the scenario rather than feeding mismatched bytes onward.
+        author_results: dict[str, dict[str, Any]] = {}
+        for author_step in scenario["authorSteps"]:
+            step_id = f"{scenario_id}-author-{author_step['name']}"
+            author_case = Case(
                 case_id=step_id,
-                operation="verifyRecord",
-                input={
-                    "targetDid": target_did,
-                    "envelopeHex": envelope_hex,
-                    "nowMs": step["nowMs"],
-                },
+                operation="authorRecord",
+                input=author_step["input"],
                 manifest={
-                    **chained.step_manifest(scenario, step_id, step["expectedResult"]),
+                    **chained.step_manifest(
+                        scenario, step_id, author_step.get("expectedResult")
+                    ),
                     "expected": {"outcome": "accepted"},
                 },
-                path=self.cases_dir,
+                path=self.cases_dirs[0],
             )
             self.chained_steps += 1
-            step_responses = self._exchange(verify_case, rust, python)
+            responses = self._exchange(author_case, rust, python)
+            if responses is None:
+                return
+            comparison = self._compare_and_record(author_case, responses, rust, python)
+            if not comparison.agreed or responses["rust"]["status"] != "accepted":
+                return
+            author_results[author_step["name"]] = responses["rust"]["result"]
+
+        for step in scenario["steps"]:
+            step_id = f"{scenario_id}-{step['suffix']}"
+            expected_result = chained.substitute(
+                step.get("expectedResult"), author_results
+            )
+            step_case = Case(
+                case_id=step_id,
+                operation=step["operation"],
+                input=chained.substitute(step["input"], author_results),
+                manifest={
+                    **chained.step_manifest(scenario, step_id, expected_result),
+                    "expected": {"outcome": "accepted"},
+                },
+                path=self.cases_dirs[0],
+            )
+            self.chained_steps += 1
+            step_responses = self._exchange(step_case, rust, python)
             if step_responses is None:
                 continue
-            self._compare_and_record(verify_case, step_responses, rust, python)
+            self._compare_and_record(step_case, step_responses, rust, python)
 
     def _run_chained_scenarios(
         self, rust: AdapterProcess, python: AdapterProcess
@@ -353,10 +357,21 @@ class CampaignRunner:
             return 2
 
         try:
-            cases = load_cases(self.repo_root, self.cases_dir)
+            cases = []
+            for cases_dir in self.cases_dirs:
+                cases.extend(load_cases(self.repo_root, cases_dir))
         except CaseError as exc:
             print(f"CASE-CORPUS REFUSAL {exc}", file=sys.stderr)
             return 2
+        ids = [c.case_id for c in cases]
+        if len(set(ids)) != len(ids):
+            print(
+                "CASE-CORPUS REFUSAL harness.case.duplicateId: case IDs "
+                "must be unique across corpora",
+                file=sys.stderr,
+            )
+            return 2
+        cases.sort(key=lambda c: c.case_id)
         if self.only is not None:
             cases = [c for c in cases if c.case_id == self.only]
             scenario_ids = {s["id"] for s in chained.SCENARIOS}
@@ -368,7 +383,7 @@ class CampaignRunner:
                 return 4
         print(
             f"integrity: pins verified; {len(cases)} validated cases from "
-            f"{self.cases_dir}"
+            f"{[str(d) for d in self.cases_dirs]}"
         )
 
         try:
@@ -424,6 +439,59 @@ class CampaignRunner:
 
         return self._summarize(cases)
 
+    def _write_promotion_proposal(self, cases: list[Case]) -> Path | None:
+        """Proposed promotion report (HARNESS.md Section 12): implementation-
+        status cases whose unchanged inputs produced independent agreement.
+        Promotion to confirmed is metadata-only, requires review, and is
+        never applied by the campaign itself."""
+        implementation_cases = [
+            c for c in cases if c.manifest["derivationStatus"] == "implementation"
+        ]
+        if not implementation_cases:
+            return None
+        agreed_by_id = {c.case_id: c.agreed for c in self.comparisons}
+        entries = []
+        for case in sorted(implementation_cases, key=lambda c: c.case_id):
+            file_digest = hashlib.sha256(case.path.read_bytes()).hexdigest()
+            entries.append(
+                {
+                    "caseId": case.case_id,
+                    "operation": case.operation,
+                    "caseFile": case.path.name,
+                    "caseFileSha256": file_digest,
+                    "currentStatus": "implementation",
+                    "independentAgreement": agreed_by_id.get(case.case_id, False),
+                    "proposedStatus": (
+                        "confirmed"
+                        if agreed_by_id.get(case.case_id, False)
+                        else "implementation"
+                    ),
+                }
+            )
+        proposal = {
+            "note": (
+                "Proposed promotions only: agreement alone does not rewrite "
+                "fixture bytes, expectations, or status. Promotion from "
+                "implementation to confirmed changes metadata only and "
+                "requires review (HARNESS.md Section 12)."
+            ),
+            "environment": self._environment(),
+            "cases": entries,
+        }
+        self.report_dir.mkdir(parents=True, exist_ok=True)
+        path = self.report_dir / "promotion-proposal.json"
+        path.write_text(
+            json.dumps(proposal, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        proposed = sum(1 for e in entries if e["proposedStatus"] == "confirmed")
+        print(
+            f"promotion proposal: {proposed} of {len(entries)} "
+            f"implementation-status cases agreed unchanged and are proposed "
+            f"for confirmed status pending review ({path})"
+        )
+        return path
+
     def _summarize(self, cases: list[Case]) -> int:
         by_operation: dict[str, int] = {}
         by_status: dict[str, int] = {}
@@ -444,6 +512,7 @@ class CampaignRunner:
         agreed = sum(1 for c in self.comparisons if c.agreed)
         spec_expected = sum(1 for case in cases if case.expected_result is not None)
 
+        self._write_promotion_proposal(cases)
         print("campaign summary (sorted by case ID, deterministic):")
         print(f"  static cases executed:     {len(cases)}")
         print(
@@ -462,6 +531,19 @@ class CampaignRunner:
         print(f"  rejection-only comparisons: {rejection_only}")
         print(f"  specification-pinned expected results: {spec_expected}")
         print(f"  repeat-executions per adapter: {2 if self.repeat else 1}")
+        divergent = [
+            c
+            for c in self.comparisons
+            if c.error_comparison == "rejectionOnly" and c.rust_error != c.python_error
+        ]
+        print(
+            f"  divergent rejection symbols (retained, not compared): {len(divergent)}"
+        )
+        for comparison in divergent:
+            print(
+                f"    {comparison.case_id}: rust={comparison.rust_error} "
+                f"python={comparison.python_error}"
+            )
         print(f"  disagreements:             {len(self.disagreements)}")
         print(f"  infrastructure failures:   {len(self.infrastructure_failures)}")
 
@@ -499,7 +581,14 @@ def main(argv: list[str] | None = None) -> int:
         "deriveIdentity, authorRecord, verifyRecord)"
     )
     parser.add_argument("--repo-root", type=Path, default=repo_root_default())
-    parser.add_argument("--cases", type=Path, default=None)
+    parser.add_argument(
+        "--cases",
+        type=Path,
+        action="append",
+        default=None,
+        help="case directory; repeatable (default: cases/specification "
+        "and cases/implementation)",
+    )
     parser.add_argument("--report-dir", type=Path, default=None)
     parser.add_argument("--timeout", type=float, default=pins.DEFAULT_TIMEOUT_SECONDS)
     parser.add_argument("--rust-adapter", default=None)
@@ -512,17 +601,21 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
     repo_root = args.repo_root.resolve()
-    cases_dir = (
-        args.cases.resolve() if args.cases else repo_root / "cases" / "specification"
-    )
+    if args.cases:
+        cases_dirs = [d.resolve() for d in args.cases]
+    else:
+        cases_dirs = [repo_root / "cases" / "specification"]
+        implementation_dir = repo_root / "cases" / "implementation"
+        if implementation_dir.is_dir():
+            cases_dirs.append(implementation_dir)
     report_dir = (
         args.report_dir.resolve()
         if args.report_dir
-        else repo_root / "reports" / "scratch" / "milestone-1"
+        else repo_root / "reports" / "scratch" / "campaign"
     )
     runner = CampaignRunner(
         repo_root=repo_root,
-        cases_dir=cases_dir,
+        cases_dirs=cases_dirs,
         report_dir=report_dir,
         timeout=args.timeout,
         rust_override=args.rust_adapter,

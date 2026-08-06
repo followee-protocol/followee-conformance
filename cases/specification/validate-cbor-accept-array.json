@@ -1,0 +1,22 @@
+{
+  "id": "validate-cbor-accept-array",
+  "runnerProtocol": "1",
+  "operation": "validateCbor",
+  "specificationCommit": "abc9a55d90f1026e6509207abda73e5dc6d14241",
+  "specificationSections": [
+    "Section 6.1"
+  ],
+  "derivationStatus": "specification",
+  "faultProfile": "none",
+  "expected": {
+    "outcome": "accepted"
+  },
+  "input": {
+    "cborHex": "8101",
+    "maxDepth": "8",
+    "maxMembers": "256"
+  },
+  "expectedResult": {
+    "valid": true
+  }
+}

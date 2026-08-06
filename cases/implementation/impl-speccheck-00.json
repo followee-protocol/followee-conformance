@@ -1,0 +1,30 @@
+{
+  "id": "impl-speccheck-00",
+  "runnerProtocol": "1",
+  "operation": "strictEd25519",
+  "specificationCommit": "abc9a55d90f1026e6509207abda73e5dc6d14241",
+  "specificationSections": [
+    "Section 3.3"
+  ],
+  "derivationStatus": "implementation",
+  "faultProfile": "unknown",
+  "expected": {
+    "outcome": "accepted"
+  },
+  "input": {
+    "publicKeyHex": "c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac03fa",
+    "messageHex": "8c93255d71dcab10e8f379c26200f3c7bd5f09d9bc3068d3ef4edeb4853022b6",
+    "signatureHex": "c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac037a0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "expectedResult": {
+    "valid": false
+  },
+  "provenance": {
+    "sourceManifest": "implementations/followee-rs/fixtures/external/PROVENANCE.json",
+    "sourceFile": "implementations/followee-rs/fixtures/external/ed25519_speccheck_cases.json",
+    "sourceFileSha256": "08e47a36d9aead288664930505584f353fff113ab854f2800db1e4f5b3540450",
+    "upstream": "https://github.com/novifinancial/ed25519-speccheck",
+    "upstreamOrigin": "Chalkias, Garillot, Nikolaenko: 'Taming the many EdDSAs' (SSR 2020) cross-implementation edge-case vectors",
+    "vectorIndex": "0"
+  }
+}

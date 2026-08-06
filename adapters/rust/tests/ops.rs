@@ -220,3 +220,171 @@ fn now_ms_beyond_uint64_is_adapter_error() {
     let response = respond_to(&case);
     assert_eq!(response["status"], "adapterError");
 }
+
+// ---------------------------------------------------------------------------
+// Milestone 2 operations, driven by the committed corpora.
+// ---------------------------------------------------------------------------
+
+fn sweep_expected_results(prefix: &str, minimum: usize) -> usize {
+    let mut checked = 0;
+    for entry in std::fs::read_dir(cases_dir()).expect("cases dir") {
+        let path = entry.expect("entry").path();
+        let name = path.file_name().unwrap().to_string_lossy().to_string();
+        if !name.starts_with(prefix) || !name.ends_with(".json") {
+            continue;
+        }
+        let case: Value = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        let response = respond_to(&case);
+        if case["expected"]["outcome"] == "rejected" {
+            assert_eq!(response["status"], "rejected", "{name}: {response}");
+            if case["expected"]["errorAssertion"] == "exact" {
+                assert_eq!(response["error"], case["expected"]["error"], "{name}");
+            }
+        } else {
+            assert_eq!(response["status"], "accepted", "{name}: {response}");
+            for (member, value) in case["expectedResult"].as_object().unwrap() {
+                assert_eq!(&response["result"][member], value, "{name}: {member}");
+            }
+        }
+        checked += 1;
+    }
+    assert!(checked >= minimum, "{prefix}: only {checked} cases swept");
+    checked
+}
+
+#[test]
+fn strict_ed25519_specification_cases() {
+    sweep_expected_results("strict-", 11);
+}
+
+#[test]
+fn next_timestamp_specification_cases() {
+    sweep_expected_results("next-", 9);
+}
+
+#[test]
+fn select_current_specification_cases() {
+    sweep_expected_results("select-", 13);
+}
+
+#[test]
+fn implementation_corpus_cases() {
+    // Provisional followee-rs fixture inputs; expectations come from the
+    // pinned provenance manifest and are re-discovered here through the
+    // adapter's public path.
+    let impl_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../cases/implementation");
+    let mut checked = 0;
+    for entry in std::fs::read_dir(&impl_dir).expect("implementation cases") {
+        let path = entry.expect("entry").path();
+        let name = path.file_name().unwrap().to_string_lossy().to_string();
+        if !name.starts_with("impl-") || !name.ends_with(".json") {
+            continue;
+        }
+        let case: Value = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        let response = respond_to(&case);
+        if case["expected"]["outcome"] == "rejected" {
+            assert_eq!(response["status"], "rejected", "{name}: {response}");
+            if case["expected"]["errorAssertion"] == "exact" {
+                assert_eq!(response["error"], case["expected"]["error"], "{name}");
+            }
+        } else {
+            assert_eq!(response["status"], "accepted", "{name}: {response}");
+            if let Some(expected) = case["expectedResult"].as_object() {
+                for (member, value) in expected {
+                    assert_eq!(&response["result"][member], value, "{name}: {member}");
+                }
+            }
+        }
+        checked += 1;
+    }
+    assert!(checked >= 49, "only {checked} implementation cases swept");
+}
+
+#[test]
+fn select_result_fields_are_complete() {
+    let response = respond_to(&load_case("select-root-only"));
+    let result = response["result"].as_object().unwrap();
+    let mut members: Vec<_> = result.keys().filter(|k| *k != "diagnostic").collect();
+    members.sort();
+    assert_eq!(members, ["authorityState", "winnerRecordBodyDigestHex"]);
+}
+
+// ---------------------------------------------------------------------------
+// validateCbor: corpus sweep, runner limit domain, and record-path parity.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn validate_cbor_specification_cases() {
+    sweep_expected_results("validate-cbor-", 38);
+}
+
+#[test]
+fn validate_cbor_limits_domain_is_runner_contract() {
+    for (member, value) in [("maxDepth", "9"), ("maxMembers", "257")] {
+        let mut case = load_case("validate-cbor-accept-uint-zero");
+        case["input"][member] = json!(value);
+        let response = respond_to(&case);
+        assert_eq!(response["status"], "adapterError", "{member}");
+        assert_eq!(response["error"], "adapter.invalidInput");
+    }
+}
+
+#[test]
+fn validate_cbor_parity_with_record_path() {
+    // The primitive must exercise the same production validator as
+    // full-record verification: identical payload bytes must classify
+    // identically through both operations, and acceptance parity holds for
+    // the published Appendix B.4 body.  A substitute validator in either
+    // path would break this.
+    let pairs: [(&str, &str, Option<&str>); 2] = [
+        (
+            "validate-cbor-accept-b4-record-body",
+            "verify-b4-root",
+            None,
+        ),
+        (
+            "validate-cbor-reordered-b4-body",
+            "verify-b7-08-reordered-body-keys",
+            Some("nonDeterministicCbor"),
+        ),
+    ];
+    for (cbor_case_id, verify_case_id, symbol) in pairs {
+        let cbor_case = load_case(cbor_case_id);
+        let verify_case = load_case(verify_case_id);
+        let payload = cbor_case["input"]["cborHex"].as_str().unwrap();
+        let envelope = verify_case["input"]["envelopeHex"].as_str().unwrap();
+        assert!(
+            envelope.contains(payload),
+            "{cbor_case_id}: payload bytes embedded in the envelope"
+        );
+        let cbor_response = respond_to(&cbor_case);
+        let verify_response = respond_to(&verify_case);
+        match symbol {
+            None => {
+                assert_eq!(cbor_response["status"], "accepted");
+                assert_eq!(verify_response["status"], "accepted");
+            }
+            Some(symbol) => {
+                assert_eq!(cbor_response["error"], symbol);
+                assert_eq!(verify_response["error"], symbol);
+            }
+        }
+    }
+}
+
+#[test]
+fn validate_cbor_parity_with_imported_duplicate_key_fixture() {
+    let cbor_case = load_case("validate-cbor-duplicate-label-b4-body");
+    let impl_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../cases/implementation/impl-b7-9-duplicate-key.json");
+    let impl_case: Value =
+        serde_json::from_str(&std::fs::read_to_string(&impl_path).unwrap()).unwrap();
+    let payload = cbor_case["input"]["cborHex"].as_str().unwrap();
+    let envelope = impl_case["input"]["envelopeHex"].as_str().unwrap();
+    assert!(
+        envelope.contains(payload),
+        "duplicate-label body embedded in the imported envelope"
+    );
+    assert_eq!(respond_to(&cbor_case)["error"], "nonDeterministicCbor");
+    assert_eq!(respond_to(&impl_case)["error"], "nonDeterministicCbor");
+}

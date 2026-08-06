@@ -1,0 +1,35 @@
+{
+  "id": "impl-b7-16c-service-id-length",
+  "runnerProtocol": "1",
+  "operation": "verifyRecord",
+  "specificationCommit": "abc9a55d90f1026e6509207abda73e5dc6d14241",
+  "specificationSections": [
+    "Appendix B.7 item 16"
+  ],
+  "derivationStatus": "implementation",
+  "faultProfile": "single",
+  "expected": {
+    "outcome": "rejected",
+    "errorAssertion": "unspecified"
+  },
+  "input": {
+    "targetDid": "did:flw:zQmPcGstBa7wW9hoYQbS6JZ4UxwZmoKr7YVf9y7qxiyD3Cm",
+    "envelopeHex": "d28443a10132a05901c0a600010178376469643a666c773a7a516d5063477374426137775739686f59516253364a5a345578775a6d6f4b7237595666397937717869794433436d021b0000019fbd68f4fb030004a3000101a2003201582003a107bff3ce10be1d70dd18e74bc09967e4d6309ba50d5f1ddc8664125531b8025820d123bafb7ae35472d9a73944d98314a38ff8f201d79c32e640f97a27bec880de07a10481a3007901016969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969696969016757656273697465027468747470733a2f2f6578616d706c652e636f6d2f5840850247d9ddabe55edeb6b5a6fc358344078f0dcaeb22a26ab684e430f4b98364a1fbff218da706393b2abcd1efb1f85fb4e752d8c3d477c8d0f7f7a73a21100c",
+    "nowMs": "1785589200123"
+  },
+  "derivedFrom": {
+    "baseVector": "B.4",
+    "mutation": "per-field over-limit variants (display name, summary, URI, alsoKnownAs count, service count, service id, extension key, depth, member count), each re-signed (variant: service-id-length)",
+    "protectedBytesChanged": false,
+    "payloadBytesChanged": true,
+    "resigned": true,
+    "resignedKey": "B.2 root seed"
+  },
+  "producedBy": "followee-rs",
+  "provenance": {
+    "sourceManifest": "implementations/followee-rs/fixtures/implementation/PROVENANCE.json",
+    "sourceCaseId": "b7-16c-field-and-aggregate-boundaries",
+    "sourceNote": null,
+    "constructedBy": "tools/fixture-builder (frozen followee-rs public API and its pinned test suite's raw constructions)"
+  }
+}

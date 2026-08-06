@@ -1,0 +1,22 @@
+[package]
+name = "followee-fixture-builder"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+description = "Reconstructs the provisional followee-rs fixture inputs described by the pinned fixtures/implementation/PROVENANCE.json manifest, using only the frozen implementation's public API plus its own test suite's documented raw byte constructions"
+license = "MIT"
+publish = false
+
+[dependencies]
+# The pinned frozen implementation, used read-only for signing, public-key
+# encoding, and DID derivation of fixture INPUTS.  Expected outputs are
+# never computed here.
+followee = { path = "../../implementations/followee-rs" }
+# The same generic base58 library the frozen implementation itself uses,
+# for encoding crafted multihash bytes into target-DID strings (input
+# construction only, no protocol decision).
+bs58 = "0.5"
+serde_json = "1"
+
+[lints.rust]
+unsafe_code = "forbid"

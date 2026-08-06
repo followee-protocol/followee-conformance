@@ -16,7 +16,7 @@ def hello_result() -> dict:
         "implementationRepository": (
             "https://github.com/followee-protocol/followee-rs"
         ),
-        "implementationCommit": "774acb7578795cf6d58f77b76b16ef010114ebd6",
+        "implementationCommit": "c30b2207aeccb4daa5fb06a388ecd0ec5e0ab625",
         "specificationCommit": "abc9a55d90f1026e6509207abda73e5dc6d14241",
         "runnerProtocols": ["1"],
         "operations": ["hello"],
@@ -65,7 +65,7 @@ class RequestSchemaTests(unittest.TestCase):
                 {
                     "runnerProtocol": "1",
                     "caseId": "x",
-                    "operation": "selectCurrent",
+                    "operation": "resolveRelay",
                     "input": {},
                 },
                 self.schema,

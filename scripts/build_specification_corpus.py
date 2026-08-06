@@ -1098,6 +1098,494 @@ def build_cases(p: Published) -> dict[str, dict]:
         True,
     )
 
+    # -- strictEd25519 (Section 3.3; Appendix B.2/B.4 published material) --
+    def strict_case(
+        case_id: str,
+        sections: list[str],
+        public_key: str,
+        message: str,
+        signature: str,
+        valid: bool,
+        fault: str = "single",
+    ) -> None:
+        add(
+            manifest(
+                case_id,
+                "strictEd25519",
+                sections,
+                "none" if valid else fault,
+                ACCEPTED,
+                {
+                    "publicKeyHex": public_key,
+                    "messageHex": message,
+                    "signatureHex": signature,
+                },
+                expected_result={"valid": valid},
+            )
+        )
+
+    strict_case(
+        "strict-b4-valid",
+        ["Section 3.3", "Appendix B.4"],
+        p.root_public_key,
+        p.b4_sig_structure,
+        p.b4_signature,
+        True,
+    )
+    strict_case(
+        "strict-b4-wrong-message",
+        ["Section 3.3 rule 7", "Appendix B.4"],
+        p.root_public_key,
+        p.b4_body,
+        p.b4_signature,
+        False,
+    )
+    strict_case(
+        "strict-b4-flipped-signature",
+        ["Section 3.3 rule 7", "Appendix B.7 item 13"],
+        p.root_public_key,
+        p.b4_sig_structure,
+        p.b4_signature[:-2] + "05",
+        False,
+    )
+    # S + L: same arithmetic as verify-b7-14 (documented byte math on the
+    # published little-endian scalar).
+    s_value = int.from_bytes(bytes.fromhex(p.b4_signature[64:]), "little")
+    strict_s_plus_l = (
+        p.b4_signature[:64] + (s_value + ED25519_L).to_bytes(32, "little").hex()
+    )
+    strict_case(
+        "strict-b4-s-plus-l",
+        ["Section 3.3 rule 4", "Appendix B.7 item 14"],
+        p.root_public_key,
+        p.b4_sig_structure,
+        strict_s_plus_l,
+        False,
+    )
+    strict_case(
+        "strict-key-31-bytes",
+        ["Section 3.3 rule 1"],
+        p.root_public_key[:-2],
+        p.b4_sig_structure,
+        p.b4_signature,
+        False,
+    )
+    strict_case(
+        "strict-key-33-bytes",
+        ["Section 3.3 rule 1"],
+        p.root_public_key + "00",
+        p.b4_sig_structure,
+        p.b4_signature,
+        False,
+    )
+    strict_case(
+        "strict-signature-63-bytes",
+        ["Section 3.3 rule 2"],
+        p.root_public_key,
+        p.b4_sig_structure,
+        p.b4_signature[:-2],
+        False,
+    )
+    strict_case(
+        "strict-signature-65-bytes",
+        ["Section 3.3 rule 2"],
+        p.root_public_key,
+        p.b4_sig_structure,
+        p.b4_signature + "00",
+        False,
+    )
+    strict_case(
+        "strict-empty-inputs",
+        ["Section 3.3 rules 1-2"],
+        "",
+        "",
+        "",
+        False,
+    )
+    # The identity point's canonical encoding is y = 1: 0x01 then 31 zero
+    # bytes (RFC 8032 point encoding; specification 3.3 rule 5).
+    strict_case(
+        "strict-key-identity-point",
+        ["Section 3.3 rule 5"],
+        "01" + "00" * 31,
+        p.b4_sig_structure,
+        p.b4_signature,
+        False,
+    )
+    # All-ones encoding declares y >= p: non-canonical (3.3 rule 3).
+    strict_case(
+        "strict-key-noncanonical",
+        ["Section 3.3 rule 3"],
+        "ff" * 32,
+        p.b4_sig_structure,
+        p.b4_signature,
+        False,
+    )
+
+    # -- nextTimestamp (Section 5.3: max(now, previous + 1), checked) ------
+    uint64_max = str(2**64 - 1)
+
+    def next_case(
+        case_id: str,
+        now: str,
+        previous: str | None,
+        timestamp: str | None,
+        error: str | None = None,
+    ) -> None:
+        add(
+            manifest(
+                case_id,
+                "nextTimestamp",
+                ["Section 5.3"],
+                "none",
+                ACCEPTED,
+                {"nowMs": now, "previousTimestampMs": previous},
+                expected_result={"timestampMs": timestamp, "error": error},
+            )
+        )
+
+    next_case("next-first-record", B4_TIMESTAMP, None, B4_TIMESTAMP)
+    next_case("next-now-behind-previous", "100", B4_TIMESTAMP, "1785589200124")
+    next_case("next-boundary-equal", "1785589200124", B4_TIMESTAMP, "1785589200124")
+    next_case("next-now-ahead", "1785589205123", B4_TIMESTAMP, "1785589205123")
+    next_case("next-zero-now", "0", None, "0")
+    next_case("next-now-max", uint64_max, None, uint64_max)
+    next_case(
+        "next-previous-max-minus-one",
+        "0",
+        "18446744073709551614",
+        uint64_max,
+    )
+    next_case("next-overflow", "0", uint64_max, None, error="overflow")
+    next_case("next-overflow-now-max", uint64_max, uint64_max, None, error="overflow")
+
+    # -- selectCurrent (Sections 8.2-8.4; published B.4/B.5/B.8 envelopes) --
+    def select_case(
+        case_id: str,
+        sections: list[str],
+        candidates: list[str],
+        winner: str | None,
+        state: str,
+        now: str = B5_TIMESTAMP,
+        sticky: str = "unknown",
+        target: str | None = None,
+        fault: str = "none",
+    ) -> None:
+        add(
+            manifest(
+                case_id,
+                "selectCurrent",
+                sections,
+                fault,
+                ACCEPTED,
+                {
+                    "targetDid": target if target is not None else p.did,
+                    "candidateEnvelopeHex": candidates,
+                    "nowMs": now,
+                    "stickyAuthority": sticky,
+                },
+                expected_result={
+                    "winnerRecordBodyDigestHex": winner,
+                    "authorityState": state,
+                },
+            )
+        )
+
+    select_case(
+        "select-root-only",
+        ["Section 8.3", "Appendix B.4"],
+        [p.b4_envelope],
+        p.b4_body_digest,
+        "root",
+        now=B4_TIMESTAMP,
+    )
+    select_case(
+        "select-revoked-precedence",
+        ["Section 8.2", "Appendix B.5"],
+        [p.b4_envelope, p.b5_envelope],
+        p.b5_body_digest,
+        "rootRevoked",
+    )
+    select_case(
+        "select-revoked-precedence-permuted",
+        ["Section 8.2", "Appendix B.5"],
+        [p.b5_envelope, p.b4_envelope],
+        p.b5_body_digest,
+        "rootRevoked",
+    )
+    select_case(
+        "select-sticky-no-root-fallback",
+        ["Section 8.2"],
+        [p.b4_envelope],
+        None,
+        "rootRevoked",
+        now=B4_TIMESTAMP,
+        sticky="rootRevoked",
+    )
+    select_case(
+        "select-revoked-under-sticky",
+        ["Section 8.2", "Appendix B.5"],
+        [p.b5_envelope],
+        p.b5_body_digest,
+        "rootRevoked",
+        sticky="rootRevoked",
+    )
+    select_case(
+        "select-duplicate-candidates",
+        ["Section 8.4", "Appendix B.4"],
+        [p.b4_envelope, p.b4_envelope],
+        p.b4_body_digest,
+        "root",
+        now=B4_TIMESTAMP,
+    )
+    select_case(
+        "select-invalid-candidate-ignored",
+        ["Section 8.1", "Appendix B.8"],
+        [p.b8_envelope, p.b4_envelope],
+        p.b4_body_digest,
+        "root",
+        now=B4_TIMESTAMP,
+        fault="single",
+    )
+    select_case(
+        "select-non-target-filtered",
+        ["Section 8.1 step 7"],
+        [p.b4_envelope, p.b5_envelope],
+        None,
+        "unknown",
+        target=p.attacker_did,
+        fault="multiple",
+    )
+    select_case(
+        "select-premature-excluded",
+        ["Section 5.4", "Section 8.3"],
+        [p.b4_envelope],
+        None,
+        "unknown",
+        now="1785588900122",
+    )
+    select_case(
+        "select-premature-revoked-not-activating",
+        ["Section 5.4", "Section 8.2"],
+        [p.b5_envelope],
+        None,
+        "unknown",
+        now="1785588901122",
+    )
+    select_case(
+        "select-empty-candidates",
+        ["Section 8.3"],
+        [],
+        None,
+        "unknown",
+        now=B4_TIMESTAMP,
+    )
+    add(
+        manifest(
+            "select-target-invalid-did",
+            "selectCurrent",
+            ["Section 3.1", "Section 8.1 step 6"],
+            "single",
+            rejected("invalidDid"),
+            {
+                "targetDid": "did:flw:",
+                "candidateEnvelopeHex": [p.b4_envelope],
+                "nowMs": B4_TIMESTAMP,
+                "stickyAuthority": "unknown",
+            },
+        )
+    )
+    select_case(
+        "select-empty-sticky-root",
+        ["Section 8.3"],
+        [],
+        None,
+        "root",
+        now=B4_TIMESTAMP,
+        sticky="root",
+    )
+
+    # -- validateCbor (Section 6.1, 15.1, 15.3; HARNESS.md 9.7) ------------
+    def cbor_case(
+        case_id: str,
+        sections: list[str],
+        cbor_hex: str,
+        error: str | None = None,
+        unspecified: bool = False,
+        depth: str = "8",
+        members: str = "256",
+        fault: str = "single",
+    ) -> None:
+        if error is None and not unspecified:
+            expected: dict = ACCEPTED
+            expected_result: dict | None = {"valid": True}
+            profile = "none"
+        else:
+            expected = rejected(None if unspecified else error)
+            expected_result = None
+            profile = fault
+        add(
+            manifest(
+                case_id,
+                "validateCbor",
+                sections,
+                profile,
+                expected,
+                {"cborHex": cbor_hex, "maxDepth": depth, "maxMembers": members},
+                expected_result=expected_result,
+            )
+        )
+
+    # Valid deterministic scalars, arrays, and maps.
+    for case_id, cbor_hex in [
+        ("validate-cbor-accept-uint-zero", "00"),
+        ("validate-cbor-accept-uint-minimal-24", "1818"),
+        ("validate-cbor-accept-null", "f6"),
+        ("validate-cbor-accept-bool", "f5"),
+        ("validate-cbor-accept-text", "6161"),
+        ("validate-cbor-accept-bytes", "4100"),
+        ("validate-cbor-accept-empty-array", "80"),
+        ("validate-cbor-accept-array", "8101"),
+        ("validate-cbor-accept-empty-map", "a0"),
+        ("validate-cbor-accept-map", "a10102"),
+        ("validate-cbor-accept-nint", "20"),
+    ]:
+        cbor_case(case_id, ["Section 6.1"], cbor_hex)
+    # Published structures: the Appendix B.3 descriptor and B.4 record body.
+    cbor_case(
+        "validate-cbor-accept-descriptor",
+        ["Section 6.1", "Appendix B.3"],
+        p.descriptor_cbor,
+    )
+    cbor_case(
+        "validate-cbor-accept-b4-record-body",
+        ["Section 6.1", "Appendix B.4"],
+        p.b4_body,
+    )
+
+    # Malformed, truncated, and trailing data: cannot be parsed safely as
+    # exactly one item (15.3 code 4).
+    for case_id, cbor_hex in [
+        ("validate-cbor-empty-input", ""),
+        ("validate-cbor-truncated-bstr", "5820" + "00" * 31),
+        ("validate-cbor-bare-break", "ff"),
+        ("validate-cbor-trailing-data", "0000"),
+    ]:
+        cbor_case(
+            case_id, ["Section 6.1", "Section 15.3"], cbor_hex, error="invalidCbor"
+        )
+
+    # Section 6.1 profile violations (15.3 code 5).
+    for case_id, cbor_hex, rule in [
+        ("validate-cbor-nonminimal-int", "1800", "rule 2"),
+        ("validate-cbor-nonminimal-length", "5800", "rule 2"),
+        ("validate-cbor-indefinite-array", "9fff", "rule 1"),
+        ("validate-cbor-indefinite-map", "bfff", "rule 1"),
+        ("validate-cbor-tag", "c101", "rule 5"),
+        ("validate-cbor-float", "f93c00", "rule 5"),
+        ("validate-cbor-undefined", "f7", "rule 5"),
+        ("validate-cbor-duplicate-key", "a201020102", "rule 4"),
+        ("validate-cbor-misordered-keys", "a202010101", "rule 3"),
+    ]:
+        cbor_case(
+            case_id, [f"Section 6.1 {rule}"], cbor_hex, error="nonDeterministicCbor"
+        )
+
+    # Classifications the pinned specification does not portably assign:
+    # rejection-only, both symbols retained diagnostically.  Invalid UTF-8
+    # sits between 15.3 codes 4 and 5 (the Python clean-room documented
+    # exactly this interpretation decision); reserved simple values are
+    # not named by Section 6.1.
+    cbor_case(
+        "validate-cbor-invalid-utf8",
+        ["Section 6.1 rule 8", "Section 15.3"],
+        "61ff",
+        unspecified=True,
+    )
+    cbor_case(
+        "validate-cbor-reserved-simple",
+        ["Section 6.1"],
+        "f820",
+        unspecified=True,
+    )
+
+    # Exact depth and member boundaries and one-over-limit failures
+    # (Section 15.1 maxima; 15.3 code 6).  A bare scalar nests at depth 0
+    # and contributes no container member, so it succeeds under zero
+    # limits; any container does not.
+    cbor_case(
+        "validate-cbor-depth-8-accepted",
+        ["Section 15.1"],
+        "81" * 8 + "01",
+    )
+    cbor_case(
+        "validate-cbor-depth-9-rejected",
+        ["Section 15.1"],
+        "81" * 9 + "01",
+        error="schemaViolation",
+    )
+    cbor_case(
+        "validate-cbor-members-256-accepted",
+        ["Section 15.1"],
+        "990100" + "00" * 256,
+    )
+    cbor_case(
+        "validate-cbor-members-257-rejected",
+        ["Section 15.1"],
+        "990101" + "00" * 257,
+        error="schemaViolation",
+    )
+    cbor_case(
+        "validate-cbor-zero-limits-scalar",
+        ["Section 15.1"],
+        "01",
+        depth="0",
+        members="0",
+    )
+    cbor_case(
+        "validate-cbor-zero-limits-null",
+        ["Section 15.1"],
+        "f6",
+        depth="0",
+        members="0",
+    )
+    cbor_case(
+        "validate-cbor-zero-depth-array-rejected",
+        ["Section 15.1"],
+        "80",
+        error="schemaViolation",
+        depth="0",
+        members="0",
+    )
+    cbor_case(
+        "validate-cbor-zero-members-element-rejected",
+        ["Section 15.1"],
+        "8101",
+        error="schemaViolation",
+        depth="1",
+        members="0",
+    )
+
+    # Record-path parity inputs: the same bytes appear as the payloads of
+    # committed verifyRecord cases, so adapter parity tests can prove the
+    # primitive exercises the same production validator as full-record
+    # verification (mutation descriptions as in verify-b7-08 and the
+    # imported impl-b7-9).
+    reordered_body_again = b4[:2] + b4[6:122] + b4[2:6] + b4[122:]
+    cbor_case(
+        "validate-cbor-reordered-b4-body",
+        ["Section 6.1 rule 3", "Appendix B.7 item 8"],
+        reordered_body_again,
+        error="nonDeterministicCbor",
+    )
+    duplicate_body = "a7" + b4[2:6] + b4[2:6] + b4[6:]
+    cbor_case(
+        "validate-cbor-duplicate-label-b4-body",
+        ["Section 6.1 rule 4", "Appendix B.7 item 9"],
+        duplicate_body,
+        error="nonDeterministicCbor",
+    )
+
     return cases
 
 

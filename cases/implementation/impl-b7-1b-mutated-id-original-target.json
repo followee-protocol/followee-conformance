@@ -1,0 +1,36 @@
+{
+  "id": "impl-b7-1b-mutated-id-original-target",
+  "runnerProtocol": "1",
+  "operation": "verifyRecord",
+  "specificationCommit": "abc9a55d90f1026e6509207abda73e5dc6d14241",
+  "specificationSections": [
+    "Appendix B.7 item 1"
+  ],
+  "derivationStatus": "implementation",
+  "faultProfile": "single",
+  "expected": {
+    "outcome": "rejected",
+    "errorAssertion": "exact",
+    "error": "identityBindingMismatch"
+  },
+  "input": {
+    "targetDid": "did:flw:zQmPcGstBa7wW9hoYQbS6JZ4UxwZmoKr7YVf9y7qxiyD3Cm",
+    "envelopeHex": "d28443a10132a0590118a600010178376469643a666c773a7a516d50646a52366b384846676266346535315037694d793461593362754773785155343966534864476863653773021b0000019fbd68f4fb030004a3000101a2003201582003a107bff3ce10be1d70dd18e74bc09967e4d6309ba50d5f1ddc8664125531b8025820d123bafb7ae35472d9a73944d98314a38ff8f201d79c32e640f97a27bec880de07a4006d416c696365204578616d706c650166577269746572038176616363743a616c696365406578616d706c652e636f6d0481a500646665656401644665656402781e68747470733a2f2f616c6963652e6578616d706c652f666565642e786d6c03746170706c69636174696f6e2f61746f6d2b786d6c046757726974696e6758406ecaa5170399d7a24f2634d4f958810385dd1bed0dab01b84aa8457cf303c5766bb64f9aa20d8b8911a3b4802a43a7bfa560da8ee3c4d6138c3c0c7fdc0baa03",
+    "nowMs": "1785589200123"
+  },
+  "derivedFrom": {
+    "baseVector": "B.4",
+    "mutation": "body label 1 replaced with the equal-length attacker DID; verified against the original target",
+    "protectedBytesChanged": false,
+    "payloadBytesChanged": true,
+    "resigned": true,
+    "resignedKey": "B.2 root seed"
+  },
+  "producedBy": "followee-rs",
+  "provenance": {
+    "sourceManifest": "implementations/followee-rs/fixtures/implementation/PROVENANCE.json",
+    "sourceCaseId": "b7-1b-mutated-id-original-target",
+    "sourceNote": "isolates body-to-target",
+    "constructedBy": "tools/fixture-builder (frozen followee-rs public API and its pinned test suite's raw constructions)"
+  }
+}

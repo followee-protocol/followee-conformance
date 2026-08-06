@@ -2,8 +2,9 @@
 # The pinned implementation submodules keep their own histories and are
 # never modified here; nothing below may cause writes inside them.
 
-# Rust adapter build output
+# Rust build output
 /adapters/rust/target/
+/tools/fixture-builder/target/
 
 # Python bytecode (adapters and harness are also run with
 # PYTHONDONTWRITEBYTECODE=1 so nothing is written into the frozen
